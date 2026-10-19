@@ -1,17 +1,41 @@
-# fashion_store_app
+# 🛍️ PRM393 - Mobile Application Development (Flutter)
+## Đề tài: Ứng dụng Mua sắm Thời trang Trực tuyến (Fashion Mobile Store App)
+**Trường Đại học FPT - Đồ án cuối kỳ môn PRM393**
 
-A new Flutter project.
+---
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+### 🚀 Tech Stack & Architecture
+- **Framework:** Flutter SDK & Dart
+- **State Management:** Provider (`ChangeNotifier`) theo mô hình MVVM
+- **Backend / Database:** Firebase (Authentication, Cloud Firestore)
+- **Map & Location:** OpenStreetMap (`flutter_map`, `geolocator`)
 
-A few resources to get you started if this is your first Flutter project:
+---
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+### 📂 Cấu trúc thư mục dự án
+Tham khảo file đặc tả chi tiết `Requirement_FashionApp_PRM393.md` nằm tại thư mục gốc của repository này.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```text
+lib/
+├── core/         # Constants, App Colors, Formatters
+├── models/       # 7 Dart Models khớp với Firestore Collections
+├── services/     # FirebaseAuth & Cloud Firestore Services
+├── providers/    # 6 ViewModels (State Management)
+└── screens/      # Toàn bộ các màn hình giao diện của app
+⚙️ Hướng dẫn chạy dự án cho thành viên nhóm
+Clone repository này về máy:
+
+Bash
+git clone https://github.com/TaiLee75/PRM393-Fashion-Store-App.git
+Xin file google-services.json từ nhóm trưởng và bỏ vào thư mục: android/app/
+
+Cài đặt các thư viện phụ thuộc:
+
+Bash
+flutter pub get
+Chạy ứng dụng trên máy ảo hoặc thiết bị thật:
+
+Bash
+flutter run
