@@ -20,6 +20,9 @@ class AppFormatters {
     return _currencyFormatter.format(amount);
   }
 
+  /// Alias tiện lợi cho formatCurrency
+  static String formatVND(num? amount) => formatCurrency(amount);
+
   /// Định dạng ngày giờ đầy đủ (VD: "20/10/2026 14:30")
   static String formatDateTime(DateTime? dateTime) {
     if (dateTime == null) return '';
@@ -37,6 +40,9 @@ class AppFormatters {
     if (dateTime == null) return '';
     return _timeFormatter.format(dateTime.toLocal());
   }
+
+  /// Alias tiện lợi cho formatTime
+  static String formatTimeOnly(DateTime? dateTime) => formatTime(dateTime);
 
   /// Định dạng thời gian tương đối cho tin nhắn / thông báo
   static String formatRelativeTime(DateTime? dateTime) {

@@ -7,8 +7,11 @@ import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../services/firestore_service.dart';
+import 'admin_branch_management_screen.dart';
+import 'admin_chat_inbox_screen.dart';
+import 'admin_product_list_screen.dart';
 
-/// Màn hình quản trị Shop (Công cụ Demo bảo vệ đồ án trước Hội đồng / Giảng viên)
+/// Màn hình Trung tâm Điều hành & Quản trị Shop Admin (Admin Portal & Demo Tool)
 class ShopAdminScreen extends StatefulWidget {
   const ShopAdminScreen({super.key});
 
@@ -24,7 +27,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<OrderProvider>().listenAllOrders();
     });
@@ -36,7 +39,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
     super.dispose();
   }
 
-  /// Nút bấm vàng: Khởi tạo Seed Data mẫu trong 2 giây
+  /// Nạp Seed Data mẫu (4 danh mục, 8 sản phẩm, 2 chi nhánh)
   Future<void> _handleSeedData() async {
     setState(() => _isSeeding = true);
 
@@ -45,14 +48,13 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
       await firestoreService.seedInitialData();
 
       if (mounted) {
-        // Làm mới dữ liệu trong ProductProvider
         await context.read<ProductProvider>().loadData();
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              '🎉 Khởi tạo dữ liệu mẫu thành công: 4 Danh mục & 8 Sản phẩm thời trang đã được nạp lên Firestore!',
+              '🎉 Khởi tạo dữ liệu mẫu thành công: Danh mục, Sản phẩm & Chi nhánh đã nạp lên Firestore!',
             ),
             backgroundColor: AppColors.success,
             duration: Duration(seconds: 4),
@@ -79,18 +81,19 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final orderProvider = context.watch<OrderProvider>();
+    final productProvider = context.watch<ProductProvider>();
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.black,
         foregroundColor: AppColors.white,
         title: const Text(
-          'SHOP ADMIN & DEMO TOOL',
+          'SHOP ADMIN MANAGEMENT PORTAL',
           style: TextStyle(
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
+            letterSpacing: 1.1,
           ),
         ),
         elevation: 0,
@@ -100,31 +103,335 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
           indicatorWeight: 3,
           labelColor: AppColors.white,
           unselectedLabelColor: Colors.white60,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          labelStyle:
+              const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           tabs: const [
-            Tab(icon: Icon(Icons.inventory_2_outlined), text: 'Duyệt Đơn Hàng'),
-            Tab(icon: Icon(Icons.settings_outlined), text: 'Công Cụ Demo'),
+            Tab(icon: Icon(Icons.dashboard_outlined), text: 'Tổng Quan'),
+            Tab(icon: Icon(Icons.inventory_2_outlined), text: 'Duyệt Đơn'),
+            Tab(icon: Icon(Icons.settings_outlined), text: 'Hệ Thống'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          // TAB 1: DUYỆT ĐƠN HÀNG (Pending -> Delivering -> Delivered)
+          // TAB 1: TỔNG QUAN DASHBOARD & CÁC PHÂN HỆ QUẢN TRỊ
+          _buildDashboardTab(productProvider, orderProvider),
+
+          // TAB 2: DUYỆT ĐƠN HÀNG (Pending -> Delivering -> Delivered)
           _buildOrdersTab(orderProvider),
 
-          // TAB 2: CÔNG CỤ SEED DATA & ROLE SWITCHER
+          // TAB 3: CÔNG CỤ SEED DATA & ROLE SWITCHER
           _buildDemoToolsTab(authProvider),
         ],
       ),
     );
   }
 
+  // ==========================================
+  // TAB 1: DASHBOARD & QUICK ACCESS MENUS
+  // ==========================================
+  Widget _buildDashboardTab(
+    ProductProvider productProvider,
+    OrderProvider orderProvider,
+  ) {
+    final products = productProvider.allProducts;
+    final orders = orderProvider.allOrders;
+
+    final pendingCount = orders.where((o) => o.status == 'Pending').length;
+    final deliveringCount =
+        orders.where((o) => o.status == 'Delivering').length;
+    final deliveredOrders = orders.where((o) => o.status == 'Delivered');
+
+    num totalRevenue = 0;
+    for (var o in deliveredOrders) {
+      totalRevenue += o.totalPrice;
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // 1. THỐNG KÊ NHANH (KPI METRICS)
+        const Text(
+          'CHỈ SỐ HOẠT ĐỘNG KINH DOANH',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                'Kho Sản Phẩm',
+                '${products.length}',
+                'mặt hàng',
+                Icons.inventory_2,
+                Colors.blue.shade700,
+                Colors.blue.shade50,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                'Chờ Duyệt Đơn',
+                '$pendingCount',
+                'đơn cần xử lý',
+                Icons.hourglass_top_rounded,
+                Colors.orange.shade800,
+                Colors.orange.shade50,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                'Đang Giao Hàng',
+                '$deliveringCount',
+                'đơn trên đường',
+                Icons.local_shipping,
+                Colors.purple.shade700,
+                Colors.purple.shade50,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                'Doanh Thu Thực',
+                AppFormatters.formatVND(totalRevenue),
+                'đơn đã giao xong',
+                Icons.monetization_on,
+                Colors.green.shade800,
+                Colors.green.shade50,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
+        // 2. PHÂN HỆ QUẢN TRỊ TRỰC TIẾP
+        const Text(
+          'PHÂN HỆ QUẢN TRỊ CỬA HÀNG',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Menu 1: Quản lý Kho sản phẩm
+        _buildNavigationCard(
+          title: 'Quản Lý Kho Hàng & Sản Phẩm',
+          subtitle:
+              'Thêm mới, chỉnh sửa thông tin, bảng size, màu sắc & xóa sản phẩm khỏi Firestore',
+          icon: Icons.app_registration,
+          iconColor: AppColors.primary,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminProductListScreen()),
+            );
+          },
+        ),
+
+        const SizedBox(height: 12),
+
+        // Menu 2: Duyệt đơn hàng
+        _buildNavigationCard(
+          title: 'Duyệt Đơn Hàng & Vận Chuyển',
+          subtitle:
+              'Xử lý trạng thái Pending -> Delivering -> Delivered và kích hoạt Real-time Notifications',
+          icon: Icons.receipt_long,
+          iconColor: Colors.blue.shade800,
+          onTap: () {
+            _tabController.animateTo(1);
+          },
+        ),
+
+        const SizedBox(height: 12),
+
+        // Menu 3: Quản lý Chi nhánh
+        _buildNavigationCard(
+          title: 'Quản Lý Hệ Thống Chi Nhánh',
+          subtitle:
+              'Thêm chi nhánh mới, cập nhật hotline, địa chỉ và tọa độ OpenStreetMap',
+          icon: Icons.store_mall_directory,
+          iconColor: Colors.teal.shade800,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AdminBranchManagementScreen(),
+              ),
+            );
+          },
+        ),
+
+        const SizedBox(height: 12),
+
+        // Menu 4: Hộp thư CSKH
+        _buildNavigationCard(
+          title: 'Hộp Thư Tư Vấn & CSKH',
+          subtitle:
+              'Xem danh sách khách hàng và phản hồi tư vấn kích cỡ theo thời gian thực',
+          icon: Icons.support_agent,
+          iconColor: Colors.orange.shade800,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminChatInboxScreen()),
+            );
+          },
+        ),
+
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildMetricCard(
+    String title,
+    String value,
+    String note,
+    IconData icon,
+    Color color,
+    Color bgLight,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: bgLight,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(icon, size: 16, color: color),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            note,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavigationCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color iconColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==========================================
+  // TAB 2: DUYỆT ĐƠN HÀNG
+  // ==========================================
   Widget _buildOrdersTab(OrderProvider orderProvider) {
     final orders = orderProvider.allOrders;
 
     if (orderProvider.isLoading && orders.isEmpty) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      );
     }
 
     if (orders.isEmpty) {
@@ -157,51 +464,46 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
   Widget _buildOrderCard(OrderModel order, OrderProvider orderProvider) {
     Color statusColor;
     String statusText;
+
     switch (order.status) {
+      case 'Pending':
+        statusColor = Colors.orange;
+        statusText = 'Chờ xử lý';
+        break;
       case 'Delivering':
         statusColor = Colors.blue;
         statusText = 'Đang giao hàng';
         break;
       case 'Delivered':
         statusColor = AppColors.success;
-        statusText = 'Đã giao thành công';
+        statusText = 'Giao thành công';
         break;
-      case 'Pending':
       default:
-        statusColor = AppColors.warning;
-        statusText = 'Chờ xác nhận';
-        break;
+        statusColor = Colors.grey;
+        statusText = order.status;
     }
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Đơn hàng
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Đơn #${order.orderId.isNotEmpty ? order.orderId.substring(0, 8) : ''}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                'Mã đơn: #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId}',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
+                  color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -216,27 +518,35 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
             ],
           ),
           const SizedBox(height: 8),
-
-          // Thông tin người nhận
-          Text('Khách: ${order.userName} - ${order.phone}'),
+          Text(
+            'Khách: ${order.userName} - ${order.phone}',
+            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+          ),
           Text(
             'Địa chỉ: ${order.shippingAddress}',
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-          ),
-          Text(
-            'Tổng thanh toán: ${AppFormatters.formatCurrency(order.totalPrice)} (${order.paymentMethod})',
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           const Divider(height: 20),
-
-          // Nút bấm chuyển trạng thái đơn (Demo trigger notification sang máy khách)
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${order.items.length} sản phẩm | PTTT: ${order.paymentMethod}',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  Text(
+                    AppFormatters.formatVND(order.totalPrice),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
               if (order.status == 'Pending') ...[
                 ElevatedButton.icon(
                   onPressed: () {
@@ -246,12 +556,14 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                       userId: order.userId,
                     );
                   },
-                  icon: const Icon(Icons.local_shipping, size: 16),
-                  label: const Text('Giao hàng (Delivering)'),
+                  icon: const Icon(Icons.local_shipping_outlined, size: 16),
+                  label: const Text('Giao hàng'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
                 ),
               ] else if (order.status == 'Delivering') ...[
@@ -264,17 +576,22 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                     );
                   },
                   icon: const Icon(Icons.check_circle_outline, size: 16),
-                  label: const Text('Hoàn tất (Delivered)'),
+                  label: const Text('Hoàn tất'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.success,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
                 ),
               ] else ...[
                 const Text(
                   '✓ Đơn hoàn tất',
-                  style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: AppColors.success,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ],
@@ -284,6 +601,9 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
     );
   }
 
+  // ==========================================
+  // TAB 3: CÔNG CỤ HỆ THỐNG & SEED DATA
+  // ==========================================
   Widget _buildDemoToolsTab(AuthProvider authProvider) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -303,7 +623,11 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.cloud_upload_outlined, color: AppColors.primary, size: 28),
+                    Icon(
+                      Icons.cloud_upload_outlined,
+                      color: AppColors.primary,
+                      size: 28,
+                    ),
                     SizedBox(width: 10),
                     Text(
                       'Khởi tạo Dữ liệu mẫu (Seed Data)',
@@ -317,8 +641,12 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Nạp tự động 4 danh mục và 8 sản phẩm thời trang chất lượng cao từ `mock_data.dart` lên Cloud Firestore chỉ với 1 click duy nhất.',
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+                  'Nạp tự động 4 danh mục, 8 sản phẩm thời trang và 2 chi nhánh cửa hàng lên Cloud Firestore chỉ với 1 click duy nhất.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -336,14 +664,21 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                           )
                         : const Icon(Icons.flash_on, color: Colors.white),
                     label: Text(
-                      _isSeeding ? 'Đang nạp dữ liệu lên Firestore...' : 'BẤM NẠP SEED DATA NGAY',
-                      style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                      _isSeeding
+                          ? 'Đang nạp dữ liệu lên Firestore...'
+                          : 'BẤM NẠP SEED DATA NGAY',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
                   ),
                 ),
@@ -365,7 +700,11 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.admin_panel_settings_outlined, color: AppColors.black, size: 28),
+                    Icon(
+                      Icons.admin_panel_settings_outlined,
+                      color: AppColors.black,
+                      size: 28,
+                    ),
                     SizedBox(width: 10),
                     Text(
                       'Chuyển đổi Vai trò (Role Switcher)',
@@ -392,7 +731,9 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.black,
                     side: const BorderSide(color: AppColors.black),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
                   child: Text(
                     authProvider.isAdmin

@@ -32,13 +32,13 @@
   - [x] **Xây dựng 7 Dart Models:** `UserModel`, `CategoryModel`, `ProductModel` (kèm `ReviewModel`), `CartItemModel`, `OrderModel`, `NotificationModel`, `MessageModel` có đủ `fromMap()`, `toMap()`, `copyWith()`.
   - [x] **Xây dựng Services Layer:** `AuthService` và `FirestoreService` (kèm hàm nạp **Seed Data** tự động nạp 4 danh mục và 8 sản phẩm mẫu Unsplash).
   - [x] **Khung điều hướng chính:** `main_nav_screen.dart` (BottomNavigationBar gom toàn bộ 5 tab của app) và bọc `MultiProvider` tại `main.dart`.
-  - [ ] **Hệ thống Quản trị Shop Admin Portal (`screens/admin/`):**
-    - [ ] `admin_dashboard_screen.dart`: Thống kê KPI doanh thu, số đơn hàng mới, tổng số sản phẩm, đơn đang giao.
-    - [ ] `admin_product_list_screen.dart`: Danh sách quản lý sản phẩm kho hàng có tìm kiếm và bộ lọc.
-    - [ ] `admin_product_form_screen.dart`: Màn hình Thêm mới & Chỉnh sửa sản phẩm (Upload ảnh URL, Tên, Giá, Mô tả, Checkbox chọn Size `[S, M, L, XL]`, Checkbox chọn Màu sắc).
-    - [ ] Chức năng Xóa sản phẩm khỏi Firestore kèm Dialog xác nhận an toàn.
-    - [ ] `admin_branch_management_screen.dart`: Quản lý danh sách chi nhánh (Thêm chi nhánh mới bằng ghim tọa độ trên Map, sửa địa chỉ, xóa chi nhánh).
-    - [ ] `admin_chat_inbox_screen.dart`: Hộp thư CSKH của Admin (Xem danh sách các khách đang cần tư vấn và mở khung chat phản hồi thời gian thực với tư cách Shop).
+  - [x] **Hệ thống Quản trị Shop Admin Portal (`screens/admin/`):**
+    - [x] `admin_dashboard_screen.dart`: Thống kê KPI doanh thu, số đơn hàng mới, tổng số sản phẩm, đơn đang giao (đã tích hợp tại Tab Tổng quan `ShopAdminScreen`).
+    - [x] `admin_product_list_screen.dart`: Danh sách quản lý sản phẩm kho hàng có tìm kiếm và bộ lọc.
+    - [x] `admin_product_form_screen.dart`: Màn hình Thêm mới & Chỉnh sửa sản phẩm (Upload ảnh URL, Tên, Giá, Mô tả, Checkbox chọn Size `[S, M, L, XL]`, Checkbox chọn Màu sắc).
+    - [x] Chức năng Xóa sản phẩm khỏi Firestore kèm Dialog xác nhận an toàn.
+    - [x] `admin_branch_management_screen.dart`: Quản lý danh sách chi nhánh (Thêm chi nhánh mới bằng ghim tọa độ trên Map, sửa địa chỉ, xóa chi nhánh).
+    - [x] `admin_chat_inbox_screen.dart`: Hộp thư CSKH của Admin (Xem danh sách các khách đang cần tư vấn và mở khung chat phản hồi thời gian thực với tư cách Shop).
   - [x] Review code (Pull Request) của các thành viên trước khi merge vào `main`.
 
 ---
