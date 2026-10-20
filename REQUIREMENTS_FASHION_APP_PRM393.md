@@ -1,4 +1,4 @@
-# BẢN ĐẶC TẢ YÊU CẦU DỰ ÁN CUỐI KỲ - PRM393 (BẢN HOÀN THIỆN 100%)
+﻿# BẢN ĐẶC TẢ YÊU CẦU DỰ ÁN CUỐI KỲ - PRM393 (BẢN HOÀN THIỆN 100%)
 ## ĐỀ TÀI: ỨNG DỤNG MUA SẮM THỜI TRANG TRỰC TUYẾN (FASHION MOBILE STORE APP)
 **Hệ thống:** Mobile Application (Flutter & Dart)  
 **Nền tảng Backend:** Firebase (Authentication, Cloud Firestore)  
@@ -412,3 +412,4 @@ Báo cáo gồm **7 mục** đúng chuẩn 100% barem chấm điểm của FPT:
 5. **Demo of Mobile Application (50%):** Ảnh chụp chi tiết từng màn hình hoạt động, giải thích luồng Provider và tối ưu hiệu năng với `Consumer`, `cached_network_image`.
 6. **Conclusion and Discussion (10%):** Ưu điểm, hạn chế của ứng dụng, bài học kinh nghiệm và định hướng mở rộng (tích hợp thanh toán trực tuyến qua cổng VNPAY/ZaloPay, gợi ý trang phục bằng AI).
 7. **Contribution Table:** Bảng đánh giá % đóng góp của từng thành viên (tổng mỗi hàng là 100%).
+

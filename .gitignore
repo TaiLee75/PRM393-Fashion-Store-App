@@ -46,3 +46,12 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+
+# Chặn file cấu hình Firebase & Key bảo mật
+**/google-services.json
+**/GoogleService-Info.plist
+*.jks
+*.keystore
+android/key.properties
+.env
