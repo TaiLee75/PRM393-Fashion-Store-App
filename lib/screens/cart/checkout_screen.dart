@@ -1,0 +1,338 @@
+// ignore_for_file: deprecated_member_use
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/utils/formatters.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/cart_provider.dart';
+import '../../providers/order_provider.dart';
+import '../map/store_map_screen.dart';
+import '../main_nav_screen.dart';
+
+/// Màn hình Thanh toán & Xác nhận đơn hàng (COD / VietQR)
+class CheckoutScreen extends StatefulWidget {
+  const CheckoutScreen({super.key});
+
+  @override
+  State<CheckoutScreen> createState() => _CheckoutScreenState();
+}
+
+class _CheckoutScreenState extends State<CheckoutScreen> {
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
+  String _paymentMethod = 'COD'; // 'COD' hoặc 'VIETQR'
+
+  @override
+  void initState() {
+    super.initState();
+    final auth = context.read<AuthProvider>();
+    _nameController.text = auth.userFullName;
+    _phoneController.text = auth.userModel?.phone ?? '';
+    _addressController.text = auth.userModel?.defaultAddress ?? '';
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handlePlaceOrder() async {
+    if (_nameController.text.trim().isEmpty ||
+        _phoneController.text.trim().isEmpty ||
+        _addressController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng điền đầy đủ Tên, SĐT và Địa chỉ nhận hàng'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    final authProvider = context.read<AuthProvider>();
+    final cartProvider = context.read<CartProvider>();
+    final orderProvider = context.read<OrderProvider>();
+
+    final orderId = await orderProvider.createOrder(
+      userId: authProvider.userId.isNotEmpty ? authProvider.userId : 'guest_user',
+      userName: _nameController.text.trim(),
+      phone: _phoneController.text.trim(),
+      shippingAddress: _addressController.text.trim(),
+      items: cartProvider.items,
+      subtotal: cartProvider.subtotal,
+      voucherCode: cartProvider.voucherCode,
+      discountAmount: cartProvider.discountAmount,
+      totalPrice: cartProvider.totalPrice,
+      paymentMethod: _paymentMethod,
+    );
+
+    if (orderId != null && mounted) {
+      cartProvider.clearCart();
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          title: const Text('🎉 Đặt hàng thành công!'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Mã đơn hàng: #${orderId.substring(0, 8)}'),
+              const SizedBox(height: 8),
+              Text('Phương thức: $_paymentMethod'),
+              if (_paymentMethod == 'VIETQR') ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.ultraLightGrey,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('NGÂN HÀNG MB BANK', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('STK: 0987654321'),
+                      Text('Chủ TK: FASHION STORE PRM393'),
+                      Text('Nội dung: DH <Mã đơn>'),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MainNavScreen(initialIndex: 2)),
+                  (route) => false,
+                );
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              child: const Text('Xem đơn hàng của tôi'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cartProvider = context.watch<CartProvider>();
+    final orderProvider = context.watch<OrderProvider>();
+
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      appBar: AppBar(
+        title: const Text(
+          'THANH TOÁN ĐƠN HÀNG',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        backgroundColor: AppColors.white,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0.5,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. THÔNG TIN GIAO HÀNG
+            const Text(
+              '1. ĐỊA CHỈ NHẬN HÀNG',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+            ),
+            const SizedBox(height: 12),
+
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Họ tên người nhận',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Số điện thoại',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _addressController,
+                    decoration: const InputDecoration(
+                      labelText: 'Địa chỉ nhận hàng chi tiết',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  icon: const Icon(Icons.map_outlined),
+                  tooltip: 'Chọn vị trí trên Bản đồ',
+                  style: IconButton.styleFrom(backgroundColor: AppColors.black),
+                  onPressed: () async {
+                    final selectedAddr = await Navigator.push<String>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const StoreMapScreen(isPickerMode: true),
+                      ),
+                    );
+                    if (selectedAddr != null && selectedAddr.isNotEmpty) {
+                      setState(() {
+                        _addressController.text = selectedAddr;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+            const Divider(height: 32),
+
+            // 2. PHƯƠNG THỨC THANH TOÁN
+            const Text(
+              '2. PHƯƠNG THỨC THANH TOÁN',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+            ),
+            const SizedBox(height: 8),
+
+            RadioListTile<String>(
+              value: 'COD',
+              groupValue: _paymentMethod,
+              title: const Text('Thanh toán khi nhận hàng (COD)'),
+              subtitle: const Text('Nhận hàng và thanh toán tiền mặt trực tiếp cho shipper'),
+              activeColor: AppColors.primary,
+              onChanged: (val) => setState(() => _paymentMethod = val!),
+            ),
+            RadioListTile<String>(
+              value: 'VIETQR',
+              groupValue: _paymentMethod,
+              title: const Text('Chuyển khoản nhanh qua VietQR'),
+              subtitle: const Text('Quét mã QR qua app ngân hàng bất kỳ (24/7)'),
+              activeColor: AppColors.primary,
+              onChanged: (val) => setState(() => _paymentMethod = val!),
+            ),
+            const Divider(height: 32),
+
+            // 3. TÓM TẮT ĐƠN HÀNG
+            const Text(
+              '3. TÓM TẮT ĐƠN HÀNG',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+            ),
+            const SizedBox(height: 12),
+
+            ...cartProvider.items.map((item) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${item.productName} (${item.size}, ${item.color}) x${item.quantity}',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                      Text(
+                        AppFormatters.formatCurrency(item.itemTotal),
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                )),
+            const Divider(height: 24),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Tạm tính:', style: TextStyle(color: AppColors.textSecondary)),
+                Text(AppFormatters.formatCurrency(cartProvider.subtotal)),
+              ],
+            ),
+            if (cartProvider.discountAmount > 0) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Chiết khấu Voucher (${cartProvider.voucherCode}):',
+                      style: const TextStyle(color: AppColors.primary)),
+                  Text(
+                    '-${AppFormatters.formatCurrency(cartProvider.discountAmount)}',
+                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Tổng thanh toán:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(
+                  AppFormatters.formatCurrency(cartProvider.totalPrice),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.priceHighlight,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+
+            // Nút Xác nhận đặt hàng
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: orderProvider.isLoading ? null : _handlePlaceOrder,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                ),
+                child: orderProvider.isLoading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Text(
+                        'XÁC NHẬN ĐẶT HÀNG',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
