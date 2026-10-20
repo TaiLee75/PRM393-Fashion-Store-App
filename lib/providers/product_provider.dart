@@ -153,4 +153,68 @@ class ProductProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  /// Thêm sản phẩm mới (Dành cho Admin)
+  Future<bool> addProduct(ProductModel product) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final generatedId = await _firestoreService.addProduct(product);
+      final newProduct = product.copyWith(id: generatedId);
+      _products.insert(0, newProduct);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Thêm sản phẩm thất bại: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Cập nhật thông tin sản phẩm (Dành cho Admin)
+  Future<bool> updateProduct(ProductModel product) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _firestoreService.updateProduct(product);
+      final index = _products.indexWhere((p) => p.id == product.id);
+      if (index >= 0) {
+        _products[index] = product;
+      }
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Cập nhật sản phẩm thất bại: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Xóa sản phẩm khỏi danh sách (Dành cho Admin)
+  Future<bool> deleteProduct(String productId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _firestoreService.deleteProduct(productId);
+      _products.removeWhere((p) => p.id == productId);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Xóa sản phẩm thất bại: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
 }

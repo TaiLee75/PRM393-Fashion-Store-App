@@ -53,7 +53,7 @@
   - [x] **Màn hình Đăng ký tài khoản (`screens/auth/register_screen.dart`):**
     - Form nhập Họ tên, Email, Mật khẩu và Xác nhận mật khẩu.
     - Lưu thông tin user vào Firebase Auth và tự động tạo Document tại collection `users`.
-  - [ ] **Validation Xác thực Chặt chẽ (`core/utils/app_validators.dart`):**
+  - [x] **Validation Xác thực Chặt chẽ (`core/utils/app_validators.dart`):**
     - Email Regex RFC chuẩn (báo lỗi nếu thiếu `@` hoặc sai định dạng domain).
     - Mật khẩu tối thiểu 6 ký tự.
     - Kiểm tra mật khẩu xác nhận phải trùng khớp tuyệt đối.

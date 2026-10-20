@@ -7,8 +7,9 @@ import '../models/cart_item_model.dart';
 import '../models/order_model.dart';
 import '../models/notification_model.dart';
 import '../models/message_model.dart';
+import '../models/branch_model.dart';
 
-/// Dịch vụ làm việc trực tiếp với Cloud Firestore cho toàn bộ 7 Collections
+/// Dịch vụ làm việc trực tiếp với Cloud Firestore cho toàn bộ 7 Collections + Branches
 class FirestoreService {
   FirebaseFirestore? _firestoreInstance;
   FirebaseFirestore get _firestore {
@@ -16,7 +17,7 @@ class FirestoreService {
     return _firestoreInstance!;
   }
 
-  // Tên 7 Collections theo đặc tả hệ thống
+  // Tên các Collections theo đặc tả hệ thống
   static const String colUsers = 'users';
   static const String colCategories = 'categories';
   static const String colProducts = 'products';
@@ -24,6 +25,7 @@ class FirestoreService {
   static const String colOrders = 'orders';
   static const String colNotifications = 'notifications';
   static const String colChats = 'chats';
+  static const String colBranches = 'branches';
 
   // ==========================================
   // 1. USERS COLLECTION
@@ -121,6 +123,29 @@ class FirestoreService {
         'rating': newRating,
       });
     });
+  }
+
+  /// Thêm sản phẩm mới lên Firestore (Dành cho Admin)
+  Future<String> addProduct(ProductModel product) async {
+    final docRef = product.id.isEmpty
+        ? _firestore.collection(colProducts).doc()
+        : _firestore.collection(colProducts).doc(product.id);
+    final toSave = product.copyWith(id: docRef.id);
+    await docRef.set(toSave.toMap());
+    return docRef.id;
+  }
+
+  /// Cập nhật thông tin sản phẩm (Dành cho Admin)
+  Future<void> updateProduct(ProductModel product) async {
+    await _firestore
+        .collection(colProducts)
+        .doc(product.id)
+        .update(product.toMap());
+  }
+
+  /// Xóa sản phẩm khỏi Firestore (Dành cho Admin)
+  Future<void> deleteProduct(String productId) async {
+    await _firestore.collection(colProducts).doc(productId).delete();
   }
 
   // ==========================================
@@ -312,6 +337,44 @@ class FirestoreService {
   }
 
   // ==========================================
+  // 8. BRANCHES COLLECTION (Chi nhánh cửa hàng)
+  // ==========================================
+  Stream<List<BranchModel>> streamBranches() {
+    return _firestore.collection(colBranches).snapshots().map((snapshot) {
+      return snapshot.docs
+          .map((doc) => BranchModel.fromMap(doc.data(), doc.id))
+          .toList();
+    });
+  }
+
+  Future<List<BranchModel>> getBranches() async {
+    final snapshot = await _firestore.collection(colBranches).get();
+    return snapshot.docs
+        .map((doc) => BranchModel.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
+  Future<String> addBranch(BranchModel branch) async {
+    final docRef = branch.id.isEmpty
+        ? _firestore.collection(colBranches).doc()
+        : _firestore.collection(colBranches).doc(branch.id);
+    final toSave = branch.copyWith(id: docRef.id);
+    await docRef.set(toSave.toMap());
+    return docRef.id;
+  }
+
+  Future<void> updateBranch(BranchModel branch) async {
+    await _firestore
+        .collection(colBranches)
+        .doc(branch.id)
+        .update(branch.toMap());
+  }
+
+  Future<void> deleteBranch(String branchId) async {
+    await _firestore.collection(colBranches).doc(branchId).delete();
+  }
+
+  // ==========================================
   // 🚀 SEED DATA MẪU (Cho nút bấm trên ShopAdminScreen)
   // ==========================================
   Future<void> seedInitialData() async {
@@ -357,6 +420,33 @@ class FirestoreService {
         'rating': prod['rating'],
         'reviews': formattedReviews,
       });
+    }
+
+    // 3. Đẩy 2 Chi nhánh cửa hàng mẫu
+    final defaultBranches = [
+      BranchModel(
+        id: 'branch_fpt_danang',
+        name: 'Chi nhánh 1 - FPT University Da Nang',
+        address: 'Khu đô thị FPT City, Ngũ Hành Sơn, Đà Nẵng',
+        latitude: 15.9689,
+        longitude: 108.2608,
+        phone: '0236 730 0999',
+        createdAt: DateTime.now(),
+      ),
+      BranchModel(
+        id: 'branch_flagship_bachdang',
+        name: 'Chi nhánh 2 - Fashion Flagship Store',
+        address: 'Đường Bạch Đằng, Quận Hải Châu, Đà Nẵng',
+        latitude: 16.0678,
+        longitude: 108.2248,
+        phone: '1900 1234',
+        createdAt: DateTime.now(),
+      ),
+    ];
+
+    for (final branch in defaultBranches) {
+      final docRef = _firestore.collection(colBranches).doc(branch.id);
+      batch.set(docRef, branch.toMap());
     }
 
     await batch.commit();
