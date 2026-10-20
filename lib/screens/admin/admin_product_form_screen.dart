@@ -62,7 +62,9 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     );
 
     if (p != null) {
-      _selectedCategoryId = p.categoryId;
+      if (_categories.any((c) => c['id'] == p.categoryId)) {
+        _selectedCategoryId = p.categoryId;
+      }
       _selectedSizes.addAll(p.sizes);
       _selectedColors.addAll(p.colors);
     } else {
