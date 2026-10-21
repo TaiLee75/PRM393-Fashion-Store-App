@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/app_validators.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
@@ -18,10 +19,13 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
   String _paymentMethod = 'COD'; // 'COD' hoặc 'VIETQR'
+  bool _saveAsDefaultAddress = false;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -41,17 +45,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _handlePlaceOrder() async {
-    if (_nameController.text.trim().isEmpty ||
-        _phoneController.text.trim().isEmpty ||
-        _addressController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng điền đầy đủ Tên, SĐT và Địa chỉ nhận hàng'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSubmitting = true);
 
     final authProvider = context.read<AuthProvider>();
     final cartProvider = context.read<CartProvider>();
@@ -70,7 +66,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       paymentMethod: _paymentMethod,
     );
 
-    if (orderId != null && mounted) {
+    // Nếu người dùng chọn lưu làm địa chỉ mặc định
+    if (_saveAsDefaultAddress && authProvider.isAuthenticated) {
+      await authProvider.updateProfile(
+        fullName: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        defaultAddress: _addressController.text.trim(),
+      );
+    }
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (orderId != null) {
       cartProvider.clearCart();
       showDialog(
         context: context,
@@ -156,59 +164,152 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             const SizedBox(height: 12),
 
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Họ tên người nhận',
-                border: OutlineInputBorder(),
-                isDense: true,
+            // BANNER BÁO ĐÃ TỰ ĐỘNG ĐIỀN TỪ PROFILE
+            if (context.watch<AuthProvider>().userModel?.defaultAddress.isNotEmpty == true)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.auto_awesome, size: 18, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Đã tự động điền Họ tên, SĐT & Địa chỉ từ Hồ sơ cá nhân của bạn.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        final auth = context.read<AuthProvider>();
+                        setState(() {
+                          _nameController.text = auth.userFullName;
+                          _phoneController.text = auth.userModel?.phone ?? '';
+                          _addressController.text = auth.userModel?.defaultAddress ?? '';
+                        });
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        child: Text(
+                          'Điền lại',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
 
-            TextField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Số điện thoại',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _addressController,
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _nameController,
                     decoration: const InputDecoration(
-                      labelText: 'Địa chỉ nhận hàng chi tiết',
+                      labelText: 'Họ tên người nhận *',
                       border: OutlineInputBorder(),
                       isDense: true,
+                      prefixIcon: Icon(Icons.person_outline, size: 20),
                     ),
+                    validator: (v) =>
+                        AppValidators.validateRequired(v, 'Họ tên người nhận'),
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  icon: const Icon(Icons.map_outlined),
-                  tooltip: 'Chọn vị trí trên Bản đồ',
-                  style: IconButton.styleFrom(backgroundColor: AppColors.black),
-                  onPressed: () async {
-                    final selectedAddr = await Navigator.push<String>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const StoreMapScreen(isPickerMode: true),
+                  const SizedBox(height: 12),
+
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Số điện thoại liên hệ *',
+                      hintText: 'VD: 0901234567 (10 chữ số)',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      prefixIcon: Icon(Icons.phone_outlined, size: 20),
+                    ),
+                    validator: AppValidators.validatePhone,
+                  ),
+                  const SizedBox(height: 12),
+
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _addressController,
+                          maxLines: 2,
+                          decoration: const InputDecoration(
+                            labelText: 'Địa chỉ nhận hàng chi tiết *',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            prefixIcon: Icon(Icons.location_on_outlined, size: 20),
+                            alignLabelWithHint: true,
+                          ),
+                          validator: (v) => AppValidators.validateRequired(
+                            v,
+                            'Địa chỉ nhận hàng',
+                          ),
+                        ),
                       ),
-                    );
-                    if (selectedAddr != null && selectedAddr.isNotEmpty) {
-                      setState(() {
-                        _addressController.text = selectedAddr;
-                      });
-                    }
-                  },
-                ),
-              ],
+                      const SizedBox(width: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: IconButton.filled(
+                          icon: const Icon(Icons.map_outlined),
+                          tooltip: 'Chọn vị trí trên Bản đồ',
+                          style: IconButton.styleFrom(backgroundColor: AppColors.black),
+                          onPressed: () async {
+                            final selectedAddr = await Navigator.push<String>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const StoreMapScreen(isPickerMode: true),
+                              ),
+                            );
+                            if (selectedAddr != null && selectedAddr.isNotEmpty) {
+                              setState(() {
+                                _addressController.text = selectedAddr;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+
+                  CheckboxListTile(
+                    value: _saveAsDefaultAddress,
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    activeColor: AppColors.primary,
+                    dense: true,
+                    title: const Text(
+                      'Lưu thông tin này làm địa chỉ nhận hàng mặc định cho các đơn sau',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    onChanged: (val) {
+                      setState(() => _saveAsDefaultAddress = val ?? false);
+                    },
+                  ),
+                ],
+              ),
             ),
             const Divider(height: 32),
 
@@ -307,14 +408,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: orderProvider.isLoading ? null : _handlePlaceOrder,
+                onPressed: (orderProvider.isLoading || _isSubmitting) ? null : _handlePlaceOrder,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                 ),
-                child: orderProvider.isLoading
+                child: (orderProvider.isLoading || _isSubmitting)
                     ? const SizedBox(
                         width: 22,
                         height: 22,
