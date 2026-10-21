@@ -196,14 +196,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   const SizedBox(height: 16),
 
                   // 3. CHỌN KÍCH CỠ (SIZE S/M/L/XL)
-                  const Text(
-                    'KÍCH CỠ',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                      color: AppColors.textPrimary,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'KÍCH CỠ',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => _showSizeChartModal(context),
+                        borderRadius: BorderRadius.circular(4),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: Row(
+                            children: [
+                              Icon(Icons.straighten, size: 16, color: AppColors.primary),
+                              SizedBox(width: 4),
+                              Text(
+                                'Bảng quy đổi kích cỡ',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Wrap(
@@ -535,4 +562,244 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       },
     );
   }
+
+  void _showSizeChartModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Tiêu đề & Nút đóng
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.straighten, color: AppColors.primary, size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'BẢNG QUY ĐỔI KÍCH CỠ (SIZE CHART)',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Thông số kích cỡ tiêu chuẩn Châu Á dành cho trang phục nam & nữ phong cách Lifewear.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                const Divider(height: 24),
+
+                // BẢNG THÔNG SỐ (Data Table)
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Table(
+                    columnWidths: const {
+                      0: FlexColumnWidth(1.2),
+                      1: FlexColumnWidth(2.2),
+                      2: FlexColumnWidth(2.0),
+                      3: FlexColumnWidth(2.0),
+                    },
+                    border: TableBorder.symmetric(
+                      inside: BorderSide(color: Colors.grey.shade200, width: 1),
+                    ),
+                    children: [
+                      // Header Row
+                      TableRow(
+                        decoration: const BoxDecoration(
+                          color: AppColors.black,
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(5)),
+                        ),
+                        children: [
+                          _buildTableHeaderCell('SIZE'),
+                          _buildTableHeaderCell('CHIỀU CAO'),
+                          _buildTableHeaderCell('CÂN NẶNG'),
+                          _buildTableHeaderCell('RỘNG NGỰC'),
+                        ],
+                      ),
+                      // Size S
+                      TableRow(
+                        decoration: BoxDecoration(
+                          color: _selectedSize == 'S' ? AppColors.primary.withValues(alpha: 0.08) : Colors.white,
+                        ),
+                        children: [
+                          _buildTableCell('S', isBold: true, highlight: _selectedSize == 'S'),
+                          _buildTableCell('155 - 165 cm'),
+                          _buildTableCell('48 - 55 kg'),
+                          _buildTableCell('84 - 88 cm'),
+                        ],
+                      ),
+                      // Size M
+                      TableRow(
+                        decoration: BoxDecoration(
+                          color: _selectedSize == 'M' ? AppColors.primary.withValues(alpha: 0.08) : Colors.white,
+                        ),
+                        children: [
+                          _buildTableCell('M', isBold: true, highlight: _selectedSize == 'M'),
+                          _buildTableCell('164 - 172 cm'),
+                          _buildTableCell('56 - 65 kg'),
+                          _buildTableCell('88 - 94 cm'),
+                        ],
+                      ),
+                      // Size L
+                      TableRow(
+                        decoration: BoxDecoration(
+                          color: _selectedSize == 'L' ? AppColors.primary.withValues(alpha: 0.08) : Colors.white,
+                        ),
+                        children: [
+                          _buildTableCell('L', isBold: true, highlight: _selectedSize == 'L'),
+                          _buildTableCell('170 - 178 cm'),
+                          _buildTableCell('66 - 75 kg'),
+                          _buildTableCell('94 - 100 cm'),
+                        ],
+                      ),
+                      // Size XL
+                      TableRow(
+                        decoration: BoxDecoration(
+                          color: _selectedSize == 'XL' ? AppColors.primary.withValues(alpha: 0.08) : Colors.white,
+                        ),
+                        children: [
+                          _buildTableCell('XL', isBold: true, highlight: _selectedSize == 'XL'),
+                          _buildTableCell('175 - 185 cm'),
+                          _buildTableCell('76 - 88 kg'),
+                          _buildTableCell('100 - 108 cm'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // GHI CHÚ MẸO CHỌN SIZE
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.ultraLightGrey,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.lightbulb_outline, size: 16, color: AppColors.primary),
+                          SizedBox(width: 6),
+                          Text(
+                            'Mẹo chọn size Uniqlo Lifewear:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        '• Muốn mặc ôm vừa vặn (Regular Fit): Hãy chọn đúng theo bảng cân nặng trên.\n• Muốn mặc rộng rãi, thoáng mát (Oversize): Nên tăng lên 1 size.\n• Nếu chiều cao và cân nặng ở 2 mốc khác nhau, nên ưu tiên chọn theo CÂN NẶNG.',
+                        style: TextStyle(fontSize: 11, color: AppColors.textSecondary, height: 1.4),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Nút Đóng
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.black,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    child: const Text(
+                      'ĐÃ HIỂU, ĐÓNG HƯỚNG DẪN',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTableHeaderCell(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTableCell(String text, {bool isBold = false, bool highlight = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+          color: highlight ? AppColors.primary : AppColors.textPrimary,
+        ),
+      ),
+    );
+  }
 }
+
