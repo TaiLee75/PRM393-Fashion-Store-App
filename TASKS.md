@@ -57,10 +57,10 @@
     - Email Regex RFC chuẩn (báo lỗi nếu thiếu `@` hoặc sai định dạng domain).
     - Mật khẩu tối thiểu 6 ký tự.
     - Kiểm tra mật khẩu xác nhận phải trùng khớp tuyệt đối.
-  - [ ] **Trang cá nhân & Chỉnh sửa hồ sơ (`screens/profile/`):**
+  - [x] **Trang cá nhân & Chỉnh sửa hồ sơ (`screens/profile/`):**
     - [x] `profile_screen.dart`: Hiển thị Avatar, Họ tên, Email, Vai trò (`Customer` hoặc `Admin`), danh sách menu tiện ích và nút Đăng xuất (kèm lệnh `cartProvider.clearCart()`).
-    - [ ] `edit_profile_screen.dart`: Màn hình cho phép khách cập nhật Họ tên, Số điện thoại (kiểm tra Regex đúng 10 chữ số VN bắt đầu bằng `0`), và Địa chỉ nhận hàng mặc định lưu vào Firestore.
-  - [x] **Viết bài Widget Test Bắt buộc:** `test/login_screen_test.dart` (Kiểm thử trực tiếp trên màn hình `LoginScreen` thật).
+    - [x] `edit_profile_screen.dart`: Màn hình cho phép khách cập nhật Họ tên, Số điện thoại (kiểm tra Regex đúng 10 chữ số VN bắt đầu bằng `0`), và Địa chỉ nhận hàng mặc định lưu vào Firestore.
+  - [x] **Viết bài Widget Test Bắt buộc:** `test/login_screen_test.dart`, `test/edit_profile_screen_test.dart`, `test/checkout_screen_test.dart`.
 
 ---
 
