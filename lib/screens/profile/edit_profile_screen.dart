@@ -278,6 +278,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         onPressed: () => setState(() {}),
                       ),
                     ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return null;
+                      return AppValidators.validateUrl(v);
+                    },
                     onChanged: (_) => setState(() {}),
                   ),
                 ],
