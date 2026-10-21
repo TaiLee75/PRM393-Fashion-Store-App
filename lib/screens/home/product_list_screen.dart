@@ -35,37 +35,172 @@ class _ProductListScreenState extends State<ProductListScreen> {
       onRefresh: () => productProvider.loadData(),
       child: CustomScrollView(
         slivers: [
-          // 1. THANH TÌM KIẾM TỨC THÌ (Real-time Search)
+          // 1. THANH TÌM KIẾM TỨC THÌ (Real-time Search) & NÚT BỘ LỌC NÂNG CAO
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (val) => productProvider.setSearchQuery(val),
-                decoration: InputDecoration(
-                  hintText: 'Tìm kiếm áo thun, áo khoác, quần jean...',
-                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
-                  prefixIcon: const Icon(Icons.search, color: AppColors.black),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () {
-                            _searchController.clear();
-                            productProvider.setSearchQuery('');
-                          },
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: AppColors.ultraLightGrey,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                  border: OutlineInputBorder(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (val) => productProvider.setSearchQuery(val),
+                      decoration: InputDecoration(
+                        hintText: 'Tìm kiếm áo thun, áo khoác, quần jean...',
+                        hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+                        prefixIcon: const Icon(Icons.search, color: AppColors.black),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  productProvider.setSearchQuery('');
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: AppColors.ultraLightGrey,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(4),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () => _showFilterBottomSheet(context),
                     borderRadius: BorderRadius.circular(4),
-                    borderSide: BorderSide.none,
+                    child: Container(
+                      height: 44,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: productProvider.activeFiltersCount > 0
+                            ? AppColors.primary
+                            : AppColors.black,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.tune, color: Colors.white, size: 18),
+                          if (productProvider.activeFiltersCount > 0) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${productProvider.activeFiltersCount}',
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 1.1. DANH SÁCH BỘ LỌC ĐANG HOẠT ĐỘNG (Active Filter Chips)
+          if (productProvider.activeFiltersCount > 0)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      if (productProvider.selectedPriceRange != 'all')
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: Chip(
+                            backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+                            side: const BorderSide(color: AppColors.primary, width: 0.8),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                            label: Text(
+                              _formatPriceRangeLabel(productProvider.selectedPriceRange),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            deleteIcon: const Icon(Icons.close, size: 14, color: AppColors.primary),
+                            onDeleted: () => productProvider.clearPriceFilter(),
+                          ),
+                        ),
+                      if (productProvider.selectedSize != null)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: Chip(
+                            backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+                            side: const BorderSide(color: AppColors.primary, width: 0.8),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                            label: Text(
+                              'Size: ${productProvider.selectedSize}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            deleteIcon: const Icon(Icons.close, size: 14, color: AppColors.primary),
+                            onDeleted: () => productProvider.clearSizeFilter(),
+                          ),
+                        ),
+                      if (productProvider.selectedColor != null)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: Chip(
+                            backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+                            side: const BorderSide(color: AppColors.primary, width: 0.8),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                            label: Text(
+                              'Màu: ${productProvider.selectedColor}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            deleteIcon: const Icon(Icons.close, size: 14, color: AppColors.primary),
+                            onDeleted: () => productProvider.clearColorFilter(),
+                          ),
+                        ),
+                      TextButton(
+                        onPressed: () => productProvider.resetFilters(),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'Xóa tất cả',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ),
 
           // 2. BANNER QUẢNG CÁO PHONG CÁCH UNIQLO LIFEWEAR
           SliverToBoxAdapter(
@@ -390,6 +525,277 @@ class _ProductListScreenState extends State<ProductListScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  String _formatPriceRangeLabel(String range) {
+    switch (range) {
+      case 'under_200k':
+        return '< 200.000đ';
+      case '200k_400k':
+        return '200k - 400k';
+      case 'above_400k':
+        return '> 400.000đ';
+      default:
+        return 'Khoảng giá';
+    }
+  }
+
+  void _showFilterBottomSheet(BuildContext context) {
+    final productProvider = context.read<ProductProvider>();
+    String tempPriceRange = productProvider.selectedPriceRange;
+    String? tempSize = productProvider.selectedSize;
+    String? tempColor = productProvider.selectedColor;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final availableColors = productProvider.availableColors;
+            final availableSizes = productProvider.availableSizes;
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Thanh gạt modal
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Tiêu đề & Nút Thiết lập lại
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.tune, color: AppColors.black, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'BỘ LỌC TÌM KIẾM NÂNG CAO',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setModalState(() {
+                              tempPriceRange = 'all';
+                              tempSize = null;
+                              tempColor = null;
+                            });
+                          },
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text(
+                            'Thiết lập lại',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24),
+
+                    // 1. Khoảng giá
+                    const Text(
+                      'KHOẢNG GIÁ',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildFilterChip(
+                          label: 'Tất cả mức giá',
+                          isSelected: tempPriceRange == 'all',
+                          onTap: () => setModalState(() => tempPriceRange = 'all'),
+                        ),
+                        _buildFilterChip(
+                          label: 'Dưới 200.000đ',
+                          isSelected: tempPriceRange == 'under_200k',
+                          onTap: () => setModalState(() => tempPriceRange = 'under_200k'),
+                        ),
+                        _buildFilterChip(
+                          label: '200k - 400.000đ',
+                          isSelected: tempPriceRange == '200k_400k',
+                          onTap: () => setModalState(() => tempPriceRange = '200k_400k'),
+                        ),
+                        _buildFilterChip(
+                          label: 'Trên 400.000đ',
+                          isSelected: tempPriceRange == 'above_400k',
+                          onTap: () => setModalState(() => tempPriceRange = 'above_400k'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // 2. Kích cỡ (Size)
+                    const Text(
+                      'KÍCH CỠ (SIZE)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildFilterChip(
+                          label: 'Tất cả size',
+                          isSelected: tempSize == null,
+                          onTap: () => setModalState(() => tempSize = null),
+                        ),
+                        ...availableSizes.map((size) {
+                          return _buildFilterChip(
+                            label: size,
+                            isSelected: tempSize == size,
+                            onTap: () => setModalState(() {
+                              tempSize = (tempSize == size) ? null : size;
+                            }),
+                          );
+                        }),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // 3. Màu sắc (Color)
+                    const Text(
+                      'MÀU SẮC',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildFilterChip(
+                          label: 'Tất cả màu',
+                          isSelected: tempColor == null,
+                          onTap: () => setModalState(() => tempColor = null),
+                        ),
+                        ...availableColors.map((color) {
+                          return _buildFilterChip(
+                            label: color,
+                            isSelected: tempColor == color,
+                            onTap: () => setModalState(() {
+                              tempColor = (tempColor == color) ? null : color;
+                            }),
+                          );
+                        }),
+                      ],
+                    ),
+                    const SizedBox(height: 26),
+
+                    // Nút Áp dụng bộ lọc
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          productProvider.setAdvancedFilters(
+                            priceRange: tempPriceRange,
+                            size: tempSize,
+                            color: tempColor,
+                          );
+                          Navigator.pop(ctx);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        child: const Text(
+                          'ÁP DỤNG BỘ LỌC',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.black : AppColors.ultraLightGrey,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: isSelected ? AppColors.black : Colors.transparent,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? Colors.white : AppColors.textPrimary,
+          ),
+        ),
       ),
     );
   }
