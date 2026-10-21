@@ -72,21 +72,21 @@
     - Thanh chọn danh mục ngang (`Tất cả`, `Áo Thun & Polo`, `Áo Khoác`, `Quần Jean`, `Phụ Kiện`).
     - Thanh tìm kiếm sản phẩm theo tên và mô tả thời gian thực (Real-time Instant Search).
     - Bộ lọc sắp xếp sản phẩm theo: Phổ biến, Giá thấp đến cao, Giá cao đến thấp, Đánh giá cao nhất.
-  - [ ] **Nâng cấp Bộ lọc Sản phẩm Nâng cao (Filter Modal):**
+  - [x] **Nâng cấp Bộ lọc Sản phẩm Nâng cao (Filter Modal):**
     - Lọc sản phẩm theo khoảng giá tùy chọn (VD: dưới 200k, 200k - 400k, trên 400k).
     - Lọc theo kích cỡ (Size S, M, L, XL) và lọc theo màu sắc.
   - [x] **Màn hình Chi tiết sản phẩm (`screens/home/product_detail_screen.dart`):**
     - Gallery ảnh sản phẩm Unsplash đa góc độ kèm chỉ số trang `1/3`.
     - Lựa chọn Màu sắc, Kích cỡ (`S/M/L/XL`), Số lượng sản phẩm kèm nút cộng/trừ.
     - Hiển thị mô tả chất liệu, phom dáng và xuất xứ.
-  - [ ] **Bảng Quy đổi Kích cỡ (Size Chart Guide Modal):**
+  - [x] **Bảng Quy đổi Kích cỡ (Size Chart Guide Modal):**
     - Bổ sung nút "Bảng quy đổi kích cỡ" cạnh mục chọn size.
     - Bấm vào mở BottomSheet hiển thị bảng thông số chiều cao & cân nặng chuẩn tương ứng từng size (S, M, L, XL) giúp khách tự tin chọn size.
   - [x] **Tính năng Viết đánh giá (Reviews):**
     - Hiển thị danh sách đánh giá kèm số sao và thời gian tương đối ("Vừa xong", "2 ngày trước").
     - Nút "Viết đánh giá" mở Dialog chấm điểm từ 1 đến 5 sao + ô nhập bình luận.
     - Ghi nhận đánh giá trực tiếp bằng `FieldValue.arrayUnion` lên Firestore và tự động tính lại điểm trung bình (`rating`).
-  - [x] **Quản lý trạng thái:** Hoàn thiện `ProductProvider`.
+  - [x] **Quản lý trạng thái & Unit Test:** Hoàn thiện `ProductProvider` và viết bộ kiểm thử tự động `test/product_provider_test.dart` (12 test case lọc đa tiêu chí, tìm kiếm & sắp xếp).
 
 ---
 
