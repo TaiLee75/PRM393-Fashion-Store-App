@@ -148,11 +148,12 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Cập nhật thông tin cá nhân (SĐT, Địa chỉ)
+  /// Cập nhật thông tin cá nhân (Họ tên, SĐT, Địa chỉ, Avatar)
   Future<bool> updateProfile({
     String? fullName,
     String? phone,
     String? defaultAddress,
+    String? avatarUrl,
   }) async {
     if (_userModel == null) return false;
     _setLoading(true);
@@ -162,6 +163,7 @@ class AuthProvider extends ChangeNotifier {
         fullName: fullName ?? _userModel!.fullName,
         phone: phone ?? _userModel!.phone,
         defaultAddress: defaultAddress ?? _userModel!.defaultAddress,
+        avatarUrl: avatarUrl ?? _userModel!.avatarUrl,
       );
       await _firestoreService.saveUser(updated);
       _userModel = updated;

@@ -7,6 +7,7 @@ import '../auth/login_screen.dart';
 import '../admin/shop_admin_screen.dart';
 import '../map/store_map_screen.dart';
 import '../notifications/notification_screen.dart';
+import 'edit_profile_screen.dart';
 
 /// Màn hình Thông tin cá nhân & Đăng xuất (Tài khoản)
 class ProfileScreen extends StatelessWidget {
@@ -16,6 +17,7 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final cartProvider = context.read<CartProvider>();
+    final userModel = authProvider.userModel;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -28,10 +30,10 @@ class ProfileScreen extends StatelessWidget {
                 CircleAvatar(
                   radius: 42,
                   backgroundColor: AppColors.primary,
-                  backgroundImage: authProvider.userModel?.avatarUrl.isNotEmpty == true
-                      ? NetworkImage(authProvider.userModel!.avatarUrl)
+                  backgroundImage: userModel?.avatarUrl.isNotEmpty == true
+                      ? NetworkImage(userModel!.avatarUrl)
                       : null,
-                  child: authProvider.userModel?.avatarUrl.isEmpty != false
+                  child: userModel?.avatarUrl.isEmpty != false
                       ? Text(
                           authProvider.userFullName.isNotEmpty
                               ? authProvider.userFullName.substring(0, 1).toUpperCase()
@@ -61,6 +63,18 @@ class ProfileScreen extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                 ),
+                if (userModel?.phone.isNotEmpty == true)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      '📞 ${userModel!.phone}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -87,6 +101,19 @@ class ProfileScreen extends StatelessWidget {
           _buildMenuSection(
             title: 'TÀI KHOẢN & TIỆN ÍCH',
             items: [
+              _MenuItem(
+                icon: Icons.person_outline,
+                title: 'Chỉnh sửa hồ sơ cá nhân',
+                subtitle: userModel?.defaultAddress.isNotEmpty == true
+                    ? userModel!.defaultAddress
+                    : 'Cập nhật SĐT, địa chỉ nhận hàng & ảnh đại diện',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+                  );
+                },
+              ),
               _MenuItem(
                 icon: Icons.notifications_outlined,
                 title: 'Thông báo',
