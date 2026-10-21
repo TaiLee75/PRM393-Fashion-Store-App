@@ -573,7 +573,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       builder: (ctx) {
         return SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,

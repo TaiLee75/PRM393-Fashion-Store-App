@@ -562,7 +562,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
             final availableSizes = productProvider.availableSizes;
 
             return SafeArea(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
