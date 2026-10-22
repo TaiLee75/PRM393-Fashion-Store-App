@@ -9,6 +9,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
 import '../map/store_map_screen.dart';
 import '../main_nav_screen.dart';
+import 'widgets/vietqr_dialog.dart';
 
 /// Màn hình Thanh toán & Xác nhận đơn hàng (COD / VietQR)
 class CheckoutScreen extends StatefulWidget {
@@ -45,13 +46,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _handlePlaceOrder() async {
+    final cartProvider = context.read<CartProvider>();
+    if (cartProvider.items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Giỏ hàng của bạn đang trống!'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);
 
     final authProvider = context.read<AuthProvider>();
-    final cartProvider = context.read<CartProvider>();
     final orderProvider = context.read<OrderProvider>();
+
+    // Lưu lại tổng tiền trước khi giỏ hàng bị xóa (clearCart)
+    final totalPaid = cartProvider.totalPrice;
 
     final orderId = await orderProvider.createOrder(
       userId: authProvider.userId.isNotEmpty ? authProvider.userId : 'guest_user',
@@ -62,7 +76,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       subtotal: cartProvider.subtotal,
       voucherCode: cartProvider.voucherCode,
       discountAmount: cartProvider.discountAmount,
-      totalPrice: cartProvider.totalPrice,
+      totalPrice: totalPaid,
       paymentMethod: _paymentMethod,
     );
 
@@ -80,52 +94,82 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     if (orderId != null) {
       cartProvider.clearCart();
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => AlertDialog(
-          title: const Text('🎉 Đặt hàng thành công!'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Mã đơn hàng: #${orderId.substring(0, 8)}'),
-              const SizedBox(height: 8),
-              Text('Phương thức: $_paymentMethod'),
-              if (_paymentMethod == 'VIETQR') ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.ultraLightGrey,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('NGÂN HÀNG MB BANK', style: TextStyle(fontWeight: FontWeight.bold)),
-                      Text('STK: 0987654321'),
-                      Text('Chủ TK: FASHION STORE PRM393'),
-                      Text('Nội dung: DH <Mã đơn>'),
-                    ],
-                  ),
+
+      if (_paymentMethod == 'VIETQR') {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => VietQrPaymentDialog(
+            orderId: orderId,
+            totalPrice: totalPaid,
+            onFinished: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const MainNavScreen(initialIndex: 2),
+                ),
+                (route) => false,
+              );
+            },
+          ),
+        );
+      } else {
+        // COD dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: AppColors.success, size: 26),
+                SizedBox(width: 8),
+                Text('Đặt hàng thành công!'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mã đơn hàng: #${orderId.length > 8 ? orderId.substring(0, 8).toUpperCase() : orderId.toUpperCase()}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text('Phương thức: Thanh toán khi nhận hàng (COD)'),
+                const SizedBox(height: 6),
+                const Text(
+                  'Cảm ơn bạn đã mua sắm! Đơn hàng sẽ được nhân viên chuẩn bị và giao sớm nhất.',
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                 ),
               ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MainNavScreen(initialIndex: 2),
+                    ),
+                    (route) => false,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Xem đơn hàng của tôi'),
+              ),
             ],
           ),
-          actions: [
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const MainNavScreen(initialIndex: 2)),
-                  (route) => false,
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              child: const Text('Xem đơn hàng của tôi'),
-            ),
-          ],
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('❌ Đặt hàng không thành công. Vui lòng kiểm tra lại kết nối và thử lại!'),
+          backgroundColor: AppColors.error,
         ),
       );
     }
@@ -331,11 +375,61 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             RadioListTile<String>(
               value: 'VIETQR',
               groupValue: _paymentMethod,
-              title: const Text('Chuyển khoản nhanh qua VietQR'),
-              subtitle: const Text('Quét mã QR qua app ngân hàng bất kỳ (24/7)'),
+              title: const Row(
+                children: [
+                  Text('Chuyển khoản VietQR'),
+                  SizedBox(width: 8),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.all(Radius.circular(3)),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Text(
+                        'NAPAS 24/7',
+                        style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              subtitle: const Text('Quét mã QR tự động điền STK & số tiền qua app Ngân hàng'),
               activeColor: AppColors.primary,
               onChanged: (val) => setState(() => _paymentMethod = val!),
             ),
+            if (_paymentMethod == 'VIETQR')
+              Container(
+                margin: const EdgeInsets.only(left: 16, right: 16, top: 4, bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.ultraLightGrey,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.qr_code_2, size: 36, color: AppColors.primary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Ngân hàng Quân Đội (MB Bank)',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Mã QR thanh toán động sẽ xuất hiện ngay sau khi bạn bấm xác nhận đặt hàng.',
+                            style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             const Divider(height: 32),
 
             // 3. TÓM TẮT ĐƠN HÀNG

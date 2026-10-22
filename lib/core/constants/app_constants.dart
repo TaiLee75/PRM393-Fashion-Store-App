@@ -20,4 +20,24 @@ class AppConstants {
     "SALE10": {"type": "percent", "value": 0.10, "desc": "Giảm 10% tổng đơn"},
     "FREESHIP": {"type": "fixed", "value": 30000, "desc": "Giảm thẳng 30.000 VNĐ"},
   };
+
+  // 3. Cấu hình Cổng thanh toán VietQR Napas247
+  static const String bankId = 'MB'; // MBBank (Ngân hàng TMCP Quân Đội)
+  static const String bankName = 'MBBank - Ngân hàng TMCP Quân Đội';
+  static const String bankAccountNo = '0987654321';
+  static const String bankAccountName = 'FASHION STORE PRM393';
+
+  /// Tạo đường link mã QR thanh toán động VietQR Napas247 theo chuẩn ngân hàng
+  static String generateVietQrUrl({
+    required num amount,
+    required String orderId,
+  }) {
+    final cleanAmount = amount.toInt();
+    final shortOrderId = orderId.length > 8
+        ? orderId.substring(0, 8).toUpperCase()
+        : orderId.toUpperCase();
+    final addInfo = Uri.encodeComponent('DH $shortOrderId');
+    final accountNameEncoded = Uri.encodeComponent(bankAccountName);
+    return 'https://img.vietqr.io/image/$bankId-$bankAccountNo-compact2.png?amount=$cleanAmount&addInfo=$addInfo&accountName=$accountNameEncoded';
+  }
 }

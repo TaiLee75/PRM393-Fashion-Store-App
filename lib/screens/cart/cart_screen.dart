@@ -23,6 +23,45 @@ class _CartScreenState extends State<CartScreen> {
     super.dispose();
   }
 
+  Future<void> _confirmRemoveItem(
+    BuildContext context,
+    dynamic item,
+    CartProvider cartProvider,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: const Text(
+          'Xóa sản phẩm',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Bạn có muốn xóa "${item.productName} (${item.size}, ${item.color})" khỏi giỏ hàng?',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('HỦY', style: TextStyle(color: AppColors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('XÓA'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      cartProvider.removeItem(item.cartItemId);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cartProvider = context.watch<CartProvider>();
@@ -119,7 +158,7 @@ class _CartScreenState extends State<CartScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.grey),
-                        onPressed: () => cartProvider.removeItem(item.cartItemId),
+                        onPressed: () => _confirmRemoveItem(context, item, cartProvider),
                       ),
                       Container(
                         decoration: BoxDecoration(
@@ -129,10 +168,16 @@ class _CartScreenState extends State<CartScreen> {
                         child: Row(
                           children: [
                             GestureDetector(
-                              onTap: () => cartProvider.updateQuantity(
-                                item.cartItemId,
-                                item.quantity - 1,
-                              ),
+                              onTap: () {
+                                if (item.quantity <= 1) {
+                                  _confirmRemoveItem(context, item, cartProvider);
+                                } else {
+                                  cartProvider.updateQuantity(
+                                    item.cartItemId,
+                                    item.quantity - 1,
+                                  );
+                                }
+                              },
                               child: const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 child: Icon(Icons.remove, size: 14),
@@ -181,6 +226,52 @@ class _CartScreenState extends State<CartScreen> {
           ),
           child: Column(
             children: [
+              // Badge Voucher đang áp dụng
+              if (cartProvider.voucherCode.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.local_offer, size: 16, color: AppColors.success),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Đang áp dụng mã: ${cartProvider.voucherCode}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.success,
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () {
+                          cartProvider.removeVoucher();
+                          _voucherController.clear();
+                        },
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: Text(
+                            'Hủy mã',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               // Ô nhập Voucher
               Row(
                 children: [

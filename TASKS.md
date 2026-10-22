@@ -107,10 +107,12 @@
     - Nút mở OpenStreetMap ghim chọn vị trí nhận hàng tự động điền về ô địa chỉ.
     - Lựa chọn phương thức thanh toán: `COD` (Thanh toán khi nhận hàng) hoặc `VIETQR` (Chuyển khoản).
     - Bấm "Xác nhận đặt hàng" $\rightarrow$ tạo đơn hàng trên collection `orders`, dọn sạch giỏ hàng (`clearCart()`) và tự động kích hoạt thông báo.
-  - [ ] **Cổng Thanh toán VietQR Động Chuẩn Ngân Hàng:**
+  - [x] **Cổng Thanh toán VietQR Động Chuẩn Ngân Hàng:**
     - Khi chọn `VIETQR`, app tự động gọi API sinh mã QR thật từ VietQR Napas247 (`https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-compact2.png?amount=<TIỀN>&addInfo=<MÃ_ĐƠN>`).
+    - Hộp thoại `VietQrPaymentDialog` hỗ trợ sao chép STK, số tiền, nội dung chuyển khoản 1 chạm.
+    - Tích hợp nút xem lại mã QR tại `OrderHistoryScreen` cho các đơn hàng chưa thanh toán.
     - Giảng viên và khách có thể mở ứng dụng ngân hàng bất kỳ để quét mã thanh toán thật lúc demo.
-  - [x] **Viết bài Unit Test Bắt buộc:** `test/cart_provider_test.dart` (Kiểm thử trực tiếp class `CartProvider` thật qua 5 test case tính tiền, áp voucher và reset giỏ hàng).
+  - [x] **Viết bài Unit & Widget Test Bắt buộc:** `test/cart_provider_test.dart` (5 unit tests cho CartProvider) và `test/vietqr_dialog_test.dart` (kiểm thử sinh URL VietQR Napas247 & Widget Test dialog thanh toán).
 
 ---
 
