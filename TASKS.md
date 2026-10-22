@@ -124,15 +124,18 @@
     - Hiển thị vị trí các chi nhánh cửa hàng kèm marker nổi bật.
     - Tích hợp `geolocator` lấy vị trí GPS hiện tại của người dùng.
     - Chế độ Picker Mode: Chạm chọn tọa độ bất kỳ trên bản đồ để xác nhận vị trí giao hàng.
-  - [ ] **Chuyển Chi nhánh sang Firestore Collection `branches`:**
-    - Thay thế dữ liệu hằng số tĩnh bằng luồng dữ liệu thời gian thực từ Firestore để đồng bộ với tính năng Thêm/Sửa/Xóa chi nhánh của Admin.
+  - [x] **Chuyển Chi nhánh sang Firestore Collection `branches`:**
+    - Thay thế dữ liệu hằng số tĩnh bằng luồng dữ liệu thời gian thực từ Firestore (`streamBranches()`) để đồng bộ với tính năng Thêm/Sửa/Xóa chi nhánh của Admin.
+    - Hỗ trợ thanh trượt Carousel chọn nhanh chi nhánh và di chuyển camera mượt mà.
   - [x] **Màn hình Lịch sử Đơn hàng (`screens/orders/order_history_screen.dart`):**
     - Lắng nghe danh sách đơn hàng của người dùng thời gian thực theo thứ tự mới nhất.
     - Hiển thị mã đơn, ngày giờ, danh sách món, trạng thái đơn (`Chờ xác nhận`, `Đang giao hàng`, `Đã giao`).
-  - [ ] **Màn hình Chi tiết Đơn hàng (`screens/orders/order_detail_screen.dart`):**
+    - Chạm vào thẻ đơn hàng để chuyển sang xem hóa đơn chi tiết.
+  - [x] **Màn hình Chi tiết Đơn hàng (`screens/orders/order_detail_screen.dart`):**
     - Bấm vào đơn hàng để xem chi tiết hóa đơn.
     - Thanh tiến trình trực quan (Timeline Stepper 3 bước: `Đặt hàng thành công` $\rightarrow$ `Đang giao hàng` $\rightarrow$ `Đã giao`).
     - Chi tiết địa chỉ giao hàng, SĐT người nhận, phương thức thanh toán và tóm tắt tiền.
+    - Hỗ trợ nút mở lại mã QR thanh toán Napas247 cho đơn VietQR và nút liên hệ tư vấn Shop.
   - [x] **Kênh Tư vấn Trực tuyến Khách hàng (`screens/chat/chat_screen.dart`):**
     - Chat thời gian thực với Shop tư vấn chiều cao/cân nặng để chọn size.
     - Giao diện bong bóng tin nhắn (Message Bubbles) phân biệt người gửi và hiển thị giờ gửi.
@@ -140,7 +143,8 @@
     - Lắng nghe real-time collection `notifications`.
     - Tự động nhận thông báo khi Đặt hàng thành công và khi Shop cập nhật trạng thái đơn hàng.
     - Huy hiệu đỏ (Badge) hiển thị số lượng thông báo chưa đọc trên AppBar.
-    - Chạm vào thông báo để đánh dấu đã xem (`isRead = true`).
+    - Chạm vào thông báo để đánh dấu đã xem (`isRead = true`) và tự động mở thẳng `OrderDetailScreen` tương ứng.
+  - [x] **Viết bài Widget Test Bắt buộc:** `test/order_detail_screen_test.dart` (Kiểm thử màn hình chi tiết đơn hàng, tiến trình Stepper 3 bước và hiển thị thông tin tiền tệ).
 
 ---
 

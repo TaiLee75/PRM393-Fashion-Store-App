@@ -6,6 +6,7 @@ import '../../models/order_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
 import '../cart/widgets/vietqr_dialog.dart';
+import 'order_detail_screen.dart';
 
 /// Màn hình Lịch sử đơn hàng của khách hàng
 class OrderHistoryScreen extends StatefulWidget {
@@ -91,114 +92,148 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         break;
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Mã đơn: #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: Text(
-                  statusText,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OrderDetailScreen(initialOrder: order),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Thời gian: ${AppFormatters.formatDateTime(order.createdAt)}',
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-          const Divider(height: 18),
-          ...order.items.map((item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${item.productName} (${item.size}, ${item.color}) x${item.quantity}',
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                    Text(
-                      AppFormatters.formatCurrency(item.itemTotal),
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              )),
-          const Divider(height: 18),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Phương thức: ${order.paymentMethod}',
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-              Text(
-                AppFormatters.formatCurrency(order.totalPrice),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.priceHighlight,
-                ),
-              ),
-            ],
-          ),
-          if (order.paymentMethod == 'VIETQR') ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (_) => VietQrPaymentDialog(
-                      orderId: order.orderId,
-                      totalPrice: order.totalPrice,
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.qr_code_2, size: 18, color: AppColors.primary),
-                label: const Text(
-                  'Xem mã QR thanh toán (Napas247)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.primary),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                ),
-              ),
+        );
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
           ],
-        ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Mã đơn: #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(
+                    statusText,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Thời gian: ${AppFormatters.formatDateTime(order.createdAt)}',
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            const Divider(height: 18),
+            ...order.items.map((item) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${item.productName} (${item.size}, ${item.color}) x${item.quantity}',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                      Text(
+                        AppFormatters.formatCurrency(item.itemTotal),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                )),
+            const Divider(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Phương thức: ${order.paymentMethod}',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                Text(
+                  AppFormatters.formatCurrency(order.totalPrice),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.priceHighlight,
+                  ),
+                ),
+              ],
+            ),
+            if (order.paymentMethod == 'VIETQR') ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (_) => VietQrPaymentDialog(
+                        orderId: order.orderId,
+                        totalPrice: order.totalPrice,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.qr_code_2, size: 18, color: AppColors.primary),
+                  label: const Text(
+                    'Xem mã QR thanh toán (Napas247)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.primary),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  'Xem chi tiết & tiến trình giao hàng',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(width: 2),
+                Icon(Icons.chevron_right, size: 16, color: AppColors.textSecondary),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

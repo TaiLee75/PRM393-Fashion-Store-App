@@ -8,7 +8,8 @@ import '../../providers/chat_provider.dart';
 
 /// Màn hình Nhắn tin tư vấn trực tuyến (Real-time Chat với Shop)
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final bool isStandalone;
+  const ChatScreen({super.key, this.isStandalone = false});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -22,6 +23,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final auth = context.read<AuthProvider>();
       final customerId = auth.userId.isNotEmpty ? auth.userId : 'guest_customer';
       context.read<ChatProvider>().listenMessages(customerId);
@@ -71,7 +73,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final messages = chatProvider.messages;
     final currentUserId = auth.userId.isNotEmpty ? auth.userId : 'guest_customer';
 
-    return Column(
+    final chatContent = Column(
       children: [
         // Banner thông tin tư vấn
         Container(
@@ -148,7 +150,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: TextField(
                     controller: _messageController,
                     textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _handleSendMessage(),
+                    onSubmitted: (_) {
+                      _handleSendMessage();
+                    },
                     decoration: InputDecoration(
                       hintText: 'Nhập câu hỏi (VD: Mình 1m72 65kg mặc size nào?)...',
                       hintStyle: const TextStyle(fontSize: 13),
@@ -172,6 +176,27 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
       ],
+    );
+
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      appBar: widget.isStandalone
+          ? AppBar(
+              title: const Text(
+                'TƯ VẤN KHÁCH HÀNG',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              backgroundColor: AppColors.white,
+              foregroundColor: AppColors.textPrimary,
+              elevation: 0.5,
+            )
+          : null,
+      body: chatContent,
     );
   }
 
