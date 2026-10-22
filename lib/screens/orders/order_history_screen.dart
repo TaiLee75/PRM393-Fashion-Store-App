@@ -5,6 +5,7 @@ import '../../core/utils/formatters.dart';
 import '../../models/order_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
+import '../cart/widgets/vietqr_dialog.dart';
 
 /// Màn hình Lịch sử đơn hàng của khách hàng
 class OrderHistoryScreen extends StatefulWidget {
@@ -166,6 +167,37 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
               ),
             ],
           ),
+          if (order.paymentMethod == 'VIETQR') ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => VietQrPaymentDialog(
+                      orderId: order.orderId,
+                      totalPrice: order.totalPrice,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.qr_code_2, size: 18, color: AppColors.primary),
+                label: const Text(
+                  'Xem mã QR thanh toán (Napas247)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primary),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
