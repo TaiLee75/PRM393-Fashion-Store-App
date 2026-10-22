@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../models/order_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../../providers/order_provider.dart';
+import '../orders/order_detail_screen.dart';
 
 /// Màn hình Thông báo người dùng (Thông báo đơn hàng & khuyến mãi)
 class NotificationScreen extends StatefulWidget {
@@ -110,6 +113,26 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   onTap: () {
                     if (!noti.isRead) {
                       notiProvider.markAsRead(noti.id);
+                    }
+
+                    // Tự động tìm đơn hàng tương ứng để mở OrderDetailScreen
+                    final orders = context.read<OrderProvider>().userOrders;
+                    OrderModel? matchedOrder;
+                    for (final o in orders) {
+                      final shortId = o.orderId.length > 8 ? o.orderId.substring(0, 8) : o.orderId;
+                      if (noti.body.contains(shortId) || noti.title.contains(shortId)) {
+                        matchedOrder = o;
+                        break;
+                      }
+                    }
+
+                    if (matchedOrder != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => OrderDetailScreen(initialOrder: matchedOrder!),
+                        ),
+                      );
                     }
                   },
                 );
