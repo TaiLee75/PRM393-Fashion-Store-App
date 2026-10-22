@@ -46,12 +46,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _handlePlaceOrder() async {
+    final cartProvider = context.read<CartProvider>();
+    if (cartProvider.items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Giỏ hàng của bạn đang trống!'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);
 
     final authProvider = context.read<AuthProvider>();
-    final cartProvider = context.read<CartProvider>();
     final orderProvider = context.read<OrderProvider>();
 
     // Lưu lại tổng tiền trước khi giỏ hàng bị xóa (clearCart)
@@ -155,6 +165,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         );
       }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('❌ Đặt hàng không thành công. Vui lòng kiểm tra lại kết nối và thử lại!'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 
