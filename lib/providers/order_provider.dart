@@ -24,6 +24,17 @@ class OrderProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  /// Thiết lập danh sách đơn hàng giả lập phục vụ Unit & Widget Testing
+  void setMockUserOrders(List<OrderModel> orders) {
+    _userOrders = orders;
+    notifyListeners();
+  }
+
+  void setMockAllOrders(List<OrderModel> orders) {
+    _allOrders = orders;
+    notifyListeners();
+  }
+
   /// Lắng nghe đơn hàng của khách hàng hiện tại
   void listenUserOrders(String userId) {
     _userOrdersSub?.cancel();
