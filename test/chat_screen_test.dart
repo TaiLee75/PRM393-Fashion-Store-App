@@ -60,6 +60,8 @@ void main() {
         find.text('Chào bạn, với chiều cao và cân nặng này bạn mặc size L là vừa đẹp nhé!'),
         findsOneWidget,
       );
+      expect(find.text('BẠN'), findsOneWidget);
+      expect(find.text('TƯ VẤN VIÊN (SHOP)'), findsOneWidget);
       expect(find.byType(TextField), findsOneWidget);
       expect(find.byIcon(Icons.send), findsOneWidget);
     });

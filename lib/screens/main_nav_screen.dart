@@ -149,8 +149,22 @@ class _MainNavScreenState extends State<MainNavScreen> {
               Icons.admin_panel_settings,
               color: authProvider.isAdmin ? AppColors.primary : AppColors.grey,
             ),
-            tooltip: 'Shop Admin Tool (Dành cho Demo)',
+            tooltip: authProvider.isAdmin
+                ? 'Shop Admin Tool (Dành cho Admin)'
+                : 'Chế độ Khách hàng (Vào Tài khoản để bật Admin)',
             onPressed: () {
+              if (!authProvider.isAdmin) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'ℹ️ Bạn đang ở chế độ Khách hàng. Hãy vào tab "Tài khoản" và chạm vào huy hiệu để chuyển sang Quản trị viên.',
+                    ),
+                    backgroundColor: AppColors.black,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+                return;
+              }
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const ShopAdminScreen()),

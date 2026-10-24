@@ -94,37 +94,71 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
 
-                // BADGE VAI TRÒ CHUYÊN NGHIỆP
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isAdmin ? AppColors.primary : AppColors.black,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isAdmin
-                            ? Icons.verified_user
-                            : Icons.shopping_bag_outlined,
-                        size: 14,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isAdmin
-                            ? 'QUẢN TRỊ VIÊN (ADMIN)'
-                            : 'KHÁCH HÀNG (CUSTOMER)',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.6,
+                // BADGE VAI TRÒ CHUYÊN NGHIỆP (BẤM VÀO ĐỂ ĐỔI VAI TRÒ DEMO)
+                InkWell(
+                  onTap: () async {
+                    await authProvider.toggleAdminRoleForDemo();
+                    if (context.mounted) {
+                      final newRoleText = authProvider.isAdmin
+                          ? 'QUẢN TRỊ VIÊN (ADMIN)'
+                          : 'KHÁCH HÀNG (CUSTOMER)';
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '🔄 Đã chuyển đổi vai trò Demo sang: $newRoleText',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          backgroundColor: AppColors.black,
+                          duration: const Duration(seconds: 2),
                         ),
-                      ),
-                    ],
+                      );
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isAdmin ? AppColors.primary : AppColors.black,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (isAdmin ? AppColors.primary : Colors.black)
+                              .withValues(alpha: 0.2),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isAdmin
+                              ? Icons.verified_user
+                              : Icons.shopping_bag_outlined,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          isAdmin
+                              ? 'QUẢN TRỊ VIÊN (ADMIN)'
+                              : 'KHÁCH HÀNG (CUSTOMER)',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(
+                          Icons.swap_horiz,
+                          size: 14,
+                          color: Colors.white70,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

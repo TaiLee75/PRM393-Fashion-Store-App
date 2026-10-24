@@ -68,10 +68,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
     final chatProvider = context.watch<ChatProvider>();
     final messages = chatProvider.messages;
-    final currentUserId = auth.userId.isNotEmpty ? auth.userId : 'guest_customer';
 
     final chatContent = Column(
       children: [
@@ -124,8 +122,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
-                    final isMe = msg.senderId == currentUserId;
-                    return _buildMessageBubble(msg, isMe);
+                    final isShop = msg.senderId == 'shop_admin' || msg.senderId == 'admin';
+                    final isMe = !isShop;
+                    return _buildMessageBubble(msg, isMe, isShop);
                   },
                 ),
         ),
@@ -200,7 +199,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(MessageModel msg, bool isMe) {
+  Widget _buildMessageBubble(MessageModel msg, bool isMe, bool isShop) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -217,10 +216,46 @@ class _ChatScreenState extends State<ChatScreen> {
             bottomLeft: Radius.circular(isMe ? 12 : 2),
             bottomRight: Radius.circular(isMe ? 2 : 12),
           ),
+          border: isMe ? null : Border.all(color: Colors.grey.shade300),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
+            if (isShop)
+              const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.support_agent, size: 14, color: AppColors.primary),
+                  SizedBox(width: 4),
+                  Text(
+                    'TƯ VẤN VIÊN (SHOP)',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              )
+            else
+              const Text(
+                'BẠN',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white70,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            const SizedBox(height: 4),
             Text(
               msg.text,
               style: TextStyle(

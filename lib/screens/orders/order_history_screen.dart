@@ -17,6 +17,10 @@ class OrderHistoryScreen extends StatefulWidget {
 }
 
 class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
+  String _selectedStatus = 'ALL';
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
@@ -29,15 +33,21 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final orderProvider = context.watch<OrderProvider>();
-    final orders = orderProvider.userOrders;
+    final rawOrders = orderProvider.userOrders;
 
-    if (orderProvider.isLoading && orders.isEmpty) {
+    if (orderProvider.isLoading && rawOrders.isEmpty) {
       return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
 
-    if (orders.isEmpty) {
+    if (rawOrders.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -62,14 +72,257 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: orders.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final order = orders[index];
-        return _buildOrderCard(order);
+    // Tính toán số lượng đơn theo từng trạng thái
+    final pendingCount = rawOrders.where((o) => o.status == 'Pending').length;
+    final deliveringCount = rawOrders.where((o) => o.status == 'Delivering').length;
+    final deliveredCount = rawOrders.where((o) => o.status == 'Delivered').length;
+
+    // Lọc danh sách theo chip trạng thái & từ khóa tìm kiếm
+    final filteredOrders = rawOrders.where((order) {
+      if (_selectedStatus != 'ALL' && order.status != _selectedStatus) {
+        return false;
+      }
+      if (_searchQuery.isNotEmpty) {
+        final q = _searchQuery.toLowerCase();
+        final matchId = order.orderId.toLowerCase().contains(q);
+        final matchProduct = order.items.any(
+          (it) => it.productName.toLowerCase().contains(q),
+        );
+        if (!matchId && !matchProduct) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
+
+    return Column(
+      children: [
+        _buildFilterBar(
+          totalCount: rawOrders.length,
+          pendingCount: pendingCount,
+          deliveringCount: deliveringCount,
+          deliveredCount: deliveredCount,
+        ),
+        const Divider(height: 1, thickness: 1, color: AppColors.border),
+        Expanded(
+          child: filteredOrders.isEmpty
+              ? _buildEmptyFilterState()
+              : RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: () async {
+                    final auth = context.read<AuthProvider>();
+                    if (auth.userId.isNotEmpty) {
+                      context.read<OrderProvider>().listenUserOrders(auth.userId);
+                    }
+                  },
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filteredOrders.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final order = filteredOrders[index];
+                      return _buildOrderCard(order);
+                    },
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterBar({
+    required int totalCount,
+    required int pendingCount,
+    required int deliveringCount,
+    required int deliveredCount,
+  }) {
+    return Container(
+      color: AppColors.white,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Ô tìm kiếm đơn hàng
+          Container(
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) {
+                setState(() => _searchQuery = val.trim());
+              },
+              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Tìm theo mã đơn hoặc tên sản phẩm...',
+                hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textSecondary),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 16, color: AppColors.textSecondary),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // 2. Hàng Chip lọc trạng thái
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildStatusChip(
+                  key: 'ALL',
+                  label: 'Tất cả',
+                  count: totalCount,
+                  activeColor: AppColors.black,
+                ),
+                const SizedBox(width: 8),
+                _buildStatusChip(
+                  key: 'Pending',
+                  label: 'Chờ xác nhận',
+                  count: pendingCount,
+                  activeColor: AppColors.warning,
+                ),
+                const SizedBox(width: 8),
+                _buildStatusChip(
+                  key: 'Delivering',
+                  label: 'Đang giao',
+                  count: deliveringCount,
+                  activeColor: Colors.blue.shade700,
+                ),
+                const SizedBox(width: 8),
+                _buildStatusChip(
+                  key: 'Delivered',
+                  label: 'Đã giao',
+                  count: deliveredCount,
+                  activeColor: AppColors.success,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusChip({
+    required String key,
+    required String label,
+    required int count,
+    required Color activeColor,
+  }) {
+    final isSelected = _selectedStatus == key;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedStatus = key;
+        });
       },
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? activeColor : Colors.grey.shade300,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyFilterState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off_rounded, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            const Text(
+              'Không tìm thấy đơn hàng phù hợp',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _searchQuery.isNotEmpty
+                  ? 'Không có đơn nào khớp với "$_searchQuery" ở trạng thái đã chọn.'
+                  : 'Không có đơn hàng nào ở trạng thái này.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _selectedStatus = 'ALL';
+                  _searchQuery = '';
+                  _searchController.clear();
+                });
+              },
+              icon: const Icon(Icons.refresh, size: 16, color: AppColors.primary),
+              label: const Text(
+                'Đặt lại bộ lọc',
+                style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

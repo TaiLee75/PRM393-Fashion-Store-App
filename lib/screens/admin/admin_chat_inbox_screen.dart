@@ -211,13 +211,11 @@ class _AdminChatDetailScreenState extends State<AdminChatDetailScreen> {
     if (text.isEmpty) return;
 
     _textController.clear();
-    final auth = context.read<AuthProvider>();
-    final adminId = auth.userId.isNotEmpty ? auth.userId : 'admin';
 
     await context.read<ChatProvider>().sendMessage(
           customerId: widget.customerId,
           text: text,
-          senderId: adminId,
+          senderId: 'shop_admin',
           customerName: widget.customerName,
         );
 
@@ -276,8 +274,9 @@ class _AdminChatDetailScreenState extends State<AdminChatDetailScreen> {
                     itemBuilder: (context, index) {
                       final msg = messages[index];
                       // Tin nhắn của Admin (shop) gửi đi
-                      final isShop = msg.senderId == adminId ||
-                          msg.senderId == 'admin';
+                      final isShop = msg.senderId == 'shop_admin' ||
+                          msg.senderId == 'admin' ||
+                          (msg.senderId == adminId && adminId != widget.customerId);
 
                       return _buildMessageBubble(msg, isShop);
                     },
@@ -370,6 +369,36 @@ class _AdminChatDetailScreenState extends State<AdminChatDetailScreen> {
           crossAxisAlignment:
               isShop ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
+            if (isShop)
+              const Text(
+                'TƯ VẤN VIÊN (BẠN)',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white70,
+                  letterSpacing: 0.5,
+                ),
+              )
+            else
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.person, size: 12, color: AppColors.textSecondary),
+                  const SizedBox(width: 4),
+                  Text(
+                    widget.customerName.isNotEmpty
+                        ? widget.customerName.toUpperCase()
+                        : 'KHÁCH HÀNG',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textSecondary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 4),
             Text(
               msg.text,
               style: TextStyle(

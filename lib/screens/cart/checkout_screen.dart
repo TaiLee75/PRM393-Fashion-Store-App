@@ -201,6 +201,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // BANNER CHẾ ĐỘ DEMO KHI LÀ ADMIN
+            if (context.watch<AuthProvider>().isAdmin)
+              Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.ultraLightGrey,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.admin_panel_settings, color: AppColors.primary, size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Chế độ Demo: Bạn đang đặt hàng với tư cách Quản trị viên (Admin) để kiểm thử luồng mua hàng.',
+                        style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // 1. THÔNG TIN GIAO HÀNG
             const Text(
               '1. ĐỊA CHỈ NHẬN HÀNG',

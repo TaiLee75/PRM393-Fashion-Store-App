@@ -23,6 +23,9 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isSeeding = false;
+  String _adminOrderFilter = 'ALL';
+  final TextEditingController _adminOrderSearchController = TextEditingController();
+  String _adminOrderQuery = '';
 
   @override
   void initState() {
@@ -35,6 +38,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
 
   @override
   void dispose() {
+    _adminOrderSearchController.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -168,10 +172,18 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
               child: _buildMetricCard(
                 'Kho Sản Phẩm',
                 '${products.length}',
-                'mặt hàng',
+                'mặt hàng (chạm để xem)',
                 Icons.inventory_2,
                 Colors.blue.shade700,
                 Colors.blue.shade50,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AdminProductListScreen(),
+                    ),
+                  );
+                },
               ),
             ),
             const SizedBox(width: 12),
@@ -179,10 +191,14 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
               child: _buildMetricCard(
                 'Chờ Duyệt Đơn',
                 '$pendingCount',
-                'đơn cần xử lý',
+                'đơn cần xử lý (lọc ngay)',
                 Icons.hourglass_top_rounded,
                 Colors.orange.shade800,
                 Colors.orange.shade50,
+                onTap: () {
+                  _tabController.animateTo(1);
+                  setState(() => _adminOrderFilter = 'Pending');
+                },
               ),
             ),
           ],
@@ -194,10 +210,14 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
               child: _buildMetricCard(
                 'Đang Giao Hàng',
                 '$deliveringCount',
-                'đơn trên đường',
+                'đơn trên đường (lọc ngay)',
                 Icons.local_shipping,
                 Colors.purple.shade700,
                 Colors.purple.shade50,
+                onTap: () {
+                  _tabController.animateTo(1);
+                  setState(() => _adminOrderFilter = 'Delivering');
+                },
               ),
             ),
             const SizedBox(width: 12),
@@ -205,10 +225,14 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
               child: _buildMetricCard(
                 'Doanh Thu Thực',
                 AppFormatters.formatVND(totalRevenue),
-                'đơn đã giao xong',
+                'đã giao xong (lọc ngay)',
                 Icons.monetization_on,
                 Colors.green.shade800,
                 Colors.green.shade50,
+                onTap: () {
+                  _tabController.animateTo(1);
+                  setState(() => _adminOrderFilter = 'Delivered');
+                },
               ),
             ),
           ],
@@ -304,9 +328,10 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
     String note,
     IconData icon,
     Color color,
-    Color bgLight,
-  ) {
-    return Container(
+    Color bgLight, {
+    VoidCallback? onTap,
+  }) {
+    final cardContent = Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -354,6 +379,15 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
         ],
       ),
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: cardContent,
+      );
+    }
+    return cardContent;
   }
 
   Widget _buildNavigationCard({
@@ -450,14 +484,251 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: orders.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final order = orders[index];
-        return _buildOrderCard(order, orderProvider);
+    // Đếm số lượng đơn theo từng trạng thái
+    final totalCount = orders.length;
+    final pendingCount = orders.where((o) => o.status == 'Pending').length;
+    final deliveringCount = orders.where((o) => o.status == 'Delivering').length;
+    final deliveredCount = orders.where((o) => o.status == 'Delivered').length;
+
+    // Lọc theo trạng thái và từ khóa tìm kiếm
+    final filteredOrders = orders.where((order) {
+      if (_adminOrderFilter != 'ALL' && order.status != _adminOrderFilter) {
+        return false;
+      }
+      if (_adminOrderQuery.isNotEmpty) {
+        final q = _adminOrderQuery.toLowerCase();
+        final matchId = order.orderId.toLowerCase().contains(q);
+        final matchUser = order.userName.toLowerCase().contains(q);
+        final matchPhone = order.phone.toLowerCase().contains(q);
+        final matchProduct = order.items.any(
+          (it) => it.productName.toLowerCase().contains(q),
+        );
+        if (!matchId && !matchUser && !matchPhone && !matchProduct) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
+
+    return Column(
+      children: [
+        _buildAdminOrderFilterSection(
+          totalCount: totalCount,
+          pendingCount: pendingCount,
+          deliveringCount: deliveringCount,
+          deliveredCount: deliveredCount,
+        ),
+        const Divider(height: 1, thickness: 1, color: AppColors.border),
+        Expanded(
+          child: filteredOrders.isEmpty
+              ? _buildAdminEmptyFilterState()
+              : ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filteredOrders.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final order = filteredOrders[index];
+                    return _buildOrderCard(order, orderProvider);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAdminOrderFilterSection({
+    required int totalCount,
+    required int pendingCount,
+    required int deliveringCount,
+    required int deliveredCount,
+  }) {
+    return Container(
+      color: AppColors.white,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Ô tìm kiếm nhanh
+          Container(
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: TextField(
+              controller: _adminOrderSearchController,
+              onChanged: (val) {
+                setState(() => _adminOrderQuery = val.trim());
+              },
+              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Tìm theo mã đơn, khách hàng, SĐT, sản phẩm...',
+                hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textSecondary),
+                suffixIcon: _adminOrderQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 16, color: AppColors.textSecondary),
+                        onPressed: () {
+                          _adminOrderSearchController.clear();
+                          setState(() => _adminOrderQuery = '');
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // 2. Chip bộ lọc trạng thái
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildAdminFilterChip(
+                  key: 'ALL',
+                  label: 'Tất cả',
+                  count: totalCount,
+                  activeColor: AppColors.black,
+                ),
+                const SizedBox(width: 8),
+                _buildAdminFilterChip(
+                  key: 'Pending',
+                  label: 'Chờ xử lý',
+                  count: pendingCount,
+                  activeColor: Colors.orange.shade800,
+                ),
+                const SizedBox(width: 8),
+                _buildAdminFilterChip(
+                  key: 'Delivering',
+                  label: 'Đang giao',
+                  count: deliveringCount,
+                  activeColor: Colors.blue.shade700,
+                ),
+                const SizedBox(width: 8),
+                _buildAdminFilterChip(
+                  key: 'Delivered',
+                  label: 'Hoàn tất',
+                  count: deliveredCount,
+                  activeColor: AppColors.success,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdminFilterChip({
+    required String key,
+    required String label,
+    required int count,
+    required Color activeColor,
+  }) {
+    final isSelected = _adminOrderFilter == key;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _adminOrderFilter = key;
+        });
       },
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? activeColor : Colors.grey.shade300,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdminEmptyFilterState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off_rounded, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            const Text(
+              'Không tìm thấy đơn hàng phù hợp',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _adminOrderQuery.isNotEmpty
+                  ? 'Không có đơn nào khớp với "$_adminOrderQuery" ở trạng thái đã chọn.'
+                  : 'Không có đơn hàng nào ở trạng thái này.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _adminOrderFilter = 'ALL';
+                  _adminOrderQuery = '';
+                  _adminOrderSearchController.clear();
+                });
+              },
+              icon: const Icon(Icons.refresh, size: 16, color: AppColors.primary),
+              label: const Text(
+                'Đặt lại bộ lọc',
+                style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
