@@ -50,6 +50,7 @@ class OrderModel {
   // Trạng thái vận hành & Lý do
   final String status; // "Pending", "Delivering", "Delivered", "Cancelled", "ReturnRequested", "Returned"
   final String cancelReason; // Lý do khách hoặc admin hủy đơn
+  final String cancelledBy; // Người thực hiện hủy ("customer" hoặc "admin")
   final String returnReason; // Lý do khách yêu cầu đổi/trả hàng
 
   // Mốc thời gian kiểm toán (Audit Timestamps)
@@ -80,6 +81,7 @@ class OrderModel {
     this.pickupBranchName = '',
     this.note = '',
     this.cancelReason = '',
+    this.cancelledBy = '',
     this.returnReason = '',
     this.status = statusPending,
     required this.createdAt,
@@ -270,6 +272,7 @@ class OrderModel {
       pickupBranchName: map['pickupBranchName'] as String? ?? '',
       note: map['note'] as String? ?? '',
       cancelReason: map['cancelReason'] as String? ?? '',
+      cancelledBy: map['cancelledBy'] as String? ?? '',
       returnReason: map['returnReason'] as String? ?? '',
       status: currentStatus,
       createdAt: parseDate(map['createdAt']),
@@ -303,6 +306,7 @@ class OrderModel {
       'note': note,
       'status': status,
       'cancelReason': cancelReason,
+      'cancelledBy': cancelledBy,
       'returnReason': returnReason,
       'createdAt': Timestamp.fromDate(createdAt),
       'deliveringAt':
@@ -336,6 +340,7 @@ class OrderModel {
     String? pickupBranchName,
     String? note,
     String? cancelReason,
+    String? cancelledBy,
     String? returnReason,
     String? status,
     DateTime? createdAt,
@@ -365,6 +370,7 @@ class OrderModel {
       pickupBranchName: pickupBranchName ?? this.pickupBranchName,
       note: note ?? this.note,
       cancelReason: cancelReason ?? this.cancelReason,
+      cancelledBy: cancelledBy ?? this.cancelledBy,
       returnReason: returnReason ?? this.returnReason,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,

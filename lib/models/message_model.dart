@@ -9,6 +9,7 @@ class MessageModel {
 
   // Đính kèm ngữ cảnh tư vấn (Order / Product Cards)
   final String? orderId; // Đính kèm đơn hàng khách đang hỏi
+  final num? orderTotalPrice; // Tổng tiền đơn hàng đính kèm
   final String? productId; // Đính kèm mã sản phẩm khách đang xem
   final String? productName; // Tên sản phẩm đính kèm
   final String? productImageUrl; // Ảnh sản phẩm đính kèm
@@ -19,6 +20,7 @@ class MessageModel {
     required this.text,
     required this.createdAt,
     this.orderId,
+    this.orderTotalPrice,
     this.productId,
     this.productName,
     this.productImageUrl,
@@ -49,6 +51,7 @@ class MessageModel {
       text: map['text'] as String? ?? '',
       createdAt: parseDate(map['createdAt']),
       orderId: map['orderId'] as String?,
+      orderTotalPrice: map['orderTotalPrice'] as num?,
       productId: map['productId'] as String?,
       productName: map['productName'] as String?,
       productImageUrl: map['productImageUrl'] as String?,
@@ -62,6 +65,7 @@ class MessageModel {
       'text': text,
       'createdAt': Timestamp.fromDate(createdAt),
       'orderId': orderId,
+      'orderTotalPrice': orderTotalPrice,
       'productId': productId,
       'productName': productName,
       'productImageUrl': productImageUrl,
@@ -74,6 +78,7 @@ class MessageModel {
     String? text,
     DateTime? createdAt,
     String? orderId,
+    num? orderTotalPrice,
     String? productId,
     String? productName,
     String? productImageUrl,
@@ -84,6 +89,7 @@ class MessageModel {
       text: text ?? this.text,
       createdAt: createdAt ?? this.createdAt,
       orderId: orderId ?? this.orderId,
+      orderTotalPrice: orderTotalPrice ?? this.orderTotalPrice,
       productId: productId ?? this.productId,
       productName: productName ?? this.productName,
       productImageUrl: productImageUrl ?? this.productImageUrl,

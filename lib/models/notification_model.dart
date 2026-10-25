@@ -5,6 +5,9 @@ class NotificationModel {
   static const String typeOrderUpdate = 'ORDER_UPDATE';
   static const String typePromotion = 'PROMOTION';
   static const String typeSystem = 'SYSTEM';
+  static const String typeOrder = 'order';
+  static const String typePayment = 'payment';
+  static const String typeChat = 'chat';
 
   final String id;
   final String userId;
@@ -13,7 +16,7 @@ class NotificationModel {
   final bool isRead;
   final DateTime createdAt;
   final String? orderId; // Mã đơn hàng liên quan (để điều hướng khi bấm vào)
-  final String type; // Loại thông báo: ORDER_UPDATE, PROMOTION, SYSTEM
+  final String type; // Loại thông báo: ORDER_UPDATE, PROMOTION, SYSTEM, order, payment, chat
 
   const NotificationModel({
     required this.id,
@@ -27,7 +30,16 @@ class NotificationModel {
   });
 
   /// Kiểm tra có phải thông báo liên quan đến đơn hàng hay không
-  bool get isOrderNotification => orderId != null && orderId!.isNotEmpty;
+  bool get isOrderNotification =>
+      (orderId != null && orderId!.isNotEmpty) ||
+      type == typeOrder ||
+      type == typeOrderUpdate;
+
+  /// Kiểm tra có phải thông báo thanh toán hay không
+  bool get isPaymentNotification => type.toLowerCase() == typePayment;
+
+  /// Kiểm tra có phải thông báo tin nhắn chat hay không
+  bool get isChatNotification => type.toLowerCase() == typeChat;
 
   factory NotificationModel.fromMap(Map<String, dynamic> map, [String? id]) {
     DateTime parseDate(dynamic date) {

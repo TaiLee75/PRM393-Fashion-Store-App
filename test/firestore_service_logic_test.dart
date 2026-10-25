@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fashion_store_app/models/cart_item_model.dart';
 import 'package:fashion_store_app/models/order_model.dart';
+import 'package:fashion_store_app/services/firestore_service.dart';
 
 void main() {
   group('Firestore Service Transaction Logic Tests (All Reads Before All Writes):', () {
@@ -91,6 +92,28 @@ void main() {
 
       expect(resolveDeliveredPaymentStatus('Unpaid'), OrderModel.paymentPaid);
       expect(resolveDeliveredPaymentStatus('PaymentSubmitted'), OrderModel.paymentPaid);
+    });
+
+    test('4. Khóa Quy tắc 22.2: Fallback branches trả về danh sách chi nhánh an toàn khi không có Firebase', () async {
+      final service = FirestoreService();
+      final branches = await service.getBranches();
+      expect(branches, isNotEmpty);
+      expect(branches.first.name, contains('Chi nhánh 1'));
+      expect(branches.first.location.latitude, closeTo(15.9689, 0.001));
+    });
+
+    test('5. Reject Return Request khôi phục trạng thái về Delivered', () {
+      String resolveRejectReturnStatus(String currentStatus) {
+        if (currentStatus == OrderModel.statusReturnRequested) {
+          return OrderModel.statusDelivered;
+        }
+        return currentStatus;
+      }
+
+      expect(
+        resolveRejectReturnStatus(OrderModel.statusReturnRequested),
+        OrderModel.statusDelivered,
+      );
     });
   });
 }

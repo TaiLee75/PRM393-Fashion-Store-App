@@ -29,6 +29,12 @@ class CartItemModel {
   /// Mã SKU biến thể (Size + Màu). Nếu không có màu thì trả về size
   String get variantSku => color.isNotEmpty ? '${size}_$color' : size;
 
+  /// Hàm tạo mã cartItemId chuẩn: ${productId}_${size}_${color}
+  static String buildCartItemId(String productId, String size,
+      [String color = '']) {
+    return color.isNotEmpty ? '${productId}_${size}_$color' : '${productId}_$size';
+  }
+
   /// Kiểm tra có trùng biến thể Size và Màu hay không
   bool isSameVariant(String s, String c) => size == s && color == c;
 

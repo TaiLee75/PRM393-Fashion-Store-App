@@ -1,5 +1,7 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:latlong2/latlong.dart';
+import '../core/constants/app_constants.dart';
 import '../core/constants/mock_data.dart';
 import '../models/user_model.dart';
 import '../models/category_model.dart';
@@ -220,6 +222,46 @@ class FirestoreService {
     await _firestore.collection(colProducts).doc(productId).delete();
   }
 
+  /// Nhập kho nhanh cho sản phẩm / SKU (Khóa Bẫy quản lý kho - Dành cho Admin)
+  Future<void> quickRestockProduct({
+    required String productId,
+    required int additionalStock,
+    String? skuKey,
+  }) async {
+    final docRef = _firestore.collection(colProducts).doc(productId);
+    await _firestore.runTransaction((transaction) async {
+      final doc = await transaction.get(docRef);
+      if (!doc.exists || doc.data() == null) {
+        throw Exception('Sản phẩm không tồn tại.');
+      }
+      final data = doc.data()!;
+      int currentStock = (data['stock'] as num?)?.toInt() ?? 0;
+
+      final rawVariantStock = data['variantStock'];
+      final Map<String, int> variantStock = {};
+      if (rawVariantStock is Map) {
+        rawVariantStock.forEach((k, v) {
+          if (v is num) variantStock[k.toString()] = v.toInt();
+        });
+      }
+
+      if (skuKey != null && skuKey.isNotEmpty) {
+        variantStock[skuKey] = (variantStock[skuKey] ?? 0) + additionalStock;
+      }
+
+      int newTotalStock = currentStock + additionalStock;
+      if (variantStock.isNotEmpty) {
+        newTotalStock = variantStock.values.fold<int>(0, (total, q) => total + q);
+      }
+
+      transaction.update(docRef, {
+        'stock': newTotalStock,
+        'variantStock': variantStock,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
   // ==========================================
   // 4. CARTS COLLECTION
   // ==========================================
@@ -367,7 +409,11 @@ class FirestoreService {
   /// - Kiểm tra chống hoàn kho kép (Double Restock).
   /// - Hoàn lại tồn kho chi tiết từng SKU và trừ lại soldCount.
   /// - Chuyển paymentStatus sang Refunded (nếu đã Paid hoặc PaymentSubmitted) hoặc Unpaid.
-  Future<void> cancelOrder(String orderId, {String? cancelReason}) async {
+  Future<void> cancelOrder(
+    String orderId, {
+    String? cancelReason,
+    String cancelledBy = 'customer',
+  }) async {
     final orderDocRef = _firestore.collection(colOrders).doc(orderId);
     String customerUserId = '';
 
@@ -466,6 +512,7 @@ class FirestoreService {
         'status': OrderModel.statusCancelled,
         'paymentStatus': newPaymentStatus,
         'cancelReason': cancelReason ?? 'Khách hàng yêu cầu hủy đơn',
+        'cancelledBy': cancelledBy,
         'cancelledAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -601,6 +648,32 @@ class FirestoreService {
     }
   }
 
+  /// Admin từ chối yêu cầu Đổi/Trả hàng (Khôi phục trạng thái Delivered)
+  Future<void> rejectReturnOrder(String orderId, {String? reason}) async {
+    final orderDocRef = _firestore.collection(colOrders).doc(orderId);
+    final doc = await orderDocRef.get();
+    if (!doc.exists) throw Exception('Đơn hàng không tồn tại.');
+    final customerUserId = doc.data()?['userId'] as String? ?? '';
+
+    await orderDocRef.update({
+      'status': OrderModel.statusDelivered,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    if (customerUserId.isNotEmpty) {
+      await createNotification(NotificationModel(
+        id: '',
+        userId: customerUserId,
+        title: 'Yêu cầu đổi/trả bị từ chối ℹ️',
+        body: reason ??
+            'Yêu cầu đổi/trả cho đơn hàng #${orderId.substring(0, min(8, orderId.length))} không được chấp thuận.',
+        orderId: orderId,
+        type: NotificationModel.typeOrderUpdate,
+        createdAt: DateTime.now(),
+      ));
+    }
+  }
+
   Stream<List<OrderModel>> streamUserOrders(String userId) {
     return _firestore
         .collection(colOrders)
@@ -625,11 +698,26 @@ class FirestoreService {
     });
   }
 
+  /// Tra cứu đơn hàng theo ID (Phục vụ Deep-Linking từ Notification hoặc tra cứu nhanh)
+  Future<OrderModel?> getOrderById(String orderId) async {
+    final doc = await _firestore.collection(colOrders).doc(orderId).get();
+    if (!doc.exists || doc.data() == null) return null;
+    return OrderModel.fromMap(doc.data()!, doc.id);
+  }
+
+  /// Lắng nghe thay đổi thời gian thực của 1 đơn hàng duy nhất (Phục vụ VietQr auto-dismiss dialog)
+  Stream<OrderModel?> streamOrder(String orderId) {
+    return _firestore.collection(colOrders).doc(orderId).snapshots().map((doc) {
+      if (!doc.exists || doc.data() == null) return null;
+      return OrderModel.fromMap(doc.data()!, doc.id);
+    });
+  }
+
   /// Cập nhật trạng thái giao hàng (Khóa Bẫy 20: Delivered -> Tự động chuyển paymentStatus = Paid)
   Future<void> updateOrderStatus({
     required String orderId,
     required String status,
-    required String userId,
+    String? userId,
   }) async {
     final Map<String, dynamic> updateData = {
       'status': status,
@@ -651,17 +739,28 @@ class FirestoreService {
       updateData['paymentStatus'] = OrderModel.paymentPaid;
     }
 
-    await _firestore.collection(colOrders).doc(orderId).update(updateData);
+    final docRef = _firestore.collection(colOrders).doc(orderId);
+    await docRef.update(updateData);
 
-    await createNotification(NotificationModel(
-      id: '',
-      userId: userId,
-      title: title,
-      body: body,
-      orderId: orderId,
-      type: NotificationModel.typeOrderUpdate,
-      createdAt: DateTime.now(),
-    ));
+    String targetUserId = userId ?? '';
+    if (targetUserId.isEmpty) {
+      try {
+        final doc = await docRef.get();
+        targetUserId = doc.data()?['userId'] as String? ?? '';
+      } catch (_) {}
+    }
+
+    if (targetUserId.isNotEmpty) {
+      await createNotification(NotificationModel(
+        id: '',
+        userId: targetUserId,
+        title: title,
+        body: body,
+        orderId: orderId,
+        type: NotificationModel.typeOrderUpdate,
+        createdAt: DateTime.now(),
+      ));
+    }
   }
 
   /// Chỉnh sửa địa chỉ nhận hàng (Khi đơn còn Pending)
@@ -860,19 +959,51 @@ class FirestoreService {
   // ==========================================
   // 9. BRANCHES COLLECTION (Chi nhánh cửa hàng)
   // ==========================================
+
+  List<BranchModel> _fallbackBranches() {
+    return AppConstants.storeBranches.asMap().entries.map((entry) {
+      final index = entry.key;
+      final map = entry.value;
+      final loc =
+          map['location'] as LatLng? ?? const LatLng(15.9689, 108.2608);
+      return BranchModel(
+        id: 'branch_fallback_$index',
+        name: map['name'] as String? ?? 'Chi nhánh $index',
+        address: map['address'] as String? ?? '',
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        phone: '1900 1234',
+        createdAt: DateTime.now(),
+      );
+    }).toList();
+  }
+
   Stream<List<BranchModel>> streamBranches() {
-    return _firestore.collection(colBranches).snapshots().map((snapshot) {
+    try {
+      return _firestore.collection(colBranches).snapshots().map((snapshot) {
+        if (snapshot.docs.isEmpty) return _fallbackBranches();
+        return snapshot.docs
+            .map((doc) => BranchModel.fromMap(doc.data(), doc.id))
+            .toList();
+      }).handleError((_) => _fallbackBranches());
+    } catch (_) {
+      return Stream.value(_fallbackBranches());
+    }
+  }
+
+  /// Alias tương thích phục vụ Quy tắc 22.2
+  Stream<List<BranchModel>> getBranchesStream() => streamBranches();
+
+  Future<List<BranchModel>> getBranches() async {
+    try {
+      final snapshot = await _firestore.collection(colBranches).get();
+      if (snapshot.docs.isEmpty) return _fallbackBranches();
       return snapshot.docs
           .map((doc) => BranchModel.fromMap(doc.data(), doc.id))
           .toList();
-    });
-  }
-
-  Future<List<BranchModel>> getBranches() async {
-    final snapshot = await _firestore.collection(colBranches).get();
-    return snapshot.docs
-        .map((doc) => BranchModel.fromMap(doc.data(), doc.id))
-        .toList();
+    } catch (_) {
+      return _fallbackBranches();
+    }
   }
 
   Future<String> addBranch(BranchModel branch) async {

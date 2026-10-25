@@ -177,6 +177,20 @@ class AuthService {
     }
   }
 
+  /// Cập nhật tên hiển thị của người dùng (displayName)
+  Future<void> updateDisplayName(String fullName) async {
+    try {
+      await currentUser?.updateDisplayName(fullName.trim());
+    } catch (_) {}
+  }
+
+  /// Nạp lại thông tin người dùng từ máy chủ Firebase Auth
+  Future<void> reloadUser() async {
+    try {
+      await currentUser?.reload();
+    } catch (_) {}
+  }
+
   /// Đăng xuất tài khoản an toàn (đảm bảo cả GoogleSignIn và FirebaseAuth đều được dọn dẹp độc lập)
   Future<void> signOut() async {
     try {
