@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Model thông tin người dùng trong hệ thống (Collection `users`)
+/// Model thông tin người dùng trong hệ thống (Collection `users`) chuẩn Enterprise
 class UserModel {
   final String uid;
   final String email;
@@ -11,6 +11,11 @@ class UserModel {
   final String role; // "customer" hoặc "admin"
   final DateTime createdAt;
 
+  // Tính năng nâng cao Enterprise
+  final List<Map<String, dynamic>> savedAddresses; // Sổ địa chỉ giao hàng
+  final List<String> wishlistProductIds; // Danh sách ID sản phẩm yêu thích
+  final Map<String, num>? bodyMeasurements; // Số đo cơ thể: {'height': 175, 'weight': 68}
+
   const UserModel({
     required this.uid,
     required this.email,
@@ -20,9 +25,35 @@ class UserModel {
     this.defaultAddress = '',
     this.role = 'customer',
     required this.createdAt,
+    this.savedAddresses = const [],
+    this.wishlistProductIds = const [],
+    this.bodyMeasurements,
   });
 
-  bool get isAdmin => role == 'admin';
+  /// Kiểm tra quyền Quản trị viên
+  bool get isAdmin => role.toLowerCase() == 'admin';
+
+  /// Kiểm tra một sản phẩm có nằm trong danh sách yêu thích hay không
+  bool isFavorite(String productId) => wishlistProductIds.contains(productId);
+
+  /// Chiều cao đã lưu (cm)
+  double? get savedHeight => bodyMeasurements?['height']?.toDouble();
+
+  /// Cân nặng đã lưu (kg)
+  double? get savedWeight => bodyMeasurements?['weight']?.toDouble();
+
+  /// Địa chỉ nhận hàng ưu tiên (Lấy từ địa chỉ mặc định trong sổ địa chỉ nếu có, hoặc fallback về defaultAddress)
+  String get effectiveDefaultAddress {
+    if (savedAddresses.isNotEmpty) {
+      final defaultItem = savedAddresses.firstWhere(
+        (a) => a['isDefault'] == true,
+        orElse: () => savedAddresses.first,
+      );
+      final addr = defaultItem['address'] as String? ?? '';
+      if (addr.isNotEmpty) return addr;
+    }
+    return defaultAddress;
+  }
 
   factory UserModel.fromMap(Map<String, dynamic> map, [String? id]) {
     DateTime parseDate(dynamic date) {
@@ -32,6 +63,37 @@ class UserModel {
       return DateTime.now();
     }
 
+    // Parse an toàn danh sách địa chỉ đã lưu
+    final List<Map<String, dynamic>> parsedAddresses = [];
+    if (map['savedAddresses'] is List) {
+      for (final item in map['savedAddresses'] as List) {
+        if (item is Map) {
+          parsedAddresses.add(Map<String, dynamic>.from(item));
+        }
+      }
+    }
+
+    // Parse an toàn danh sách sản phẩm yêu thích
+    final List<String> parsedWishlist = [];
+    if (map['wishlistProductIds'] is List) {
+      for (final item in map['wishlistProductIds'] as List) {
+        if (item != null) {
+          parsedWishlist.add(item.toString());
+        }
+      }
+    }
+
+    // Parse an toàn số đo cơ thể
+    Map<String, num>? parsedMeasurements;
+    if (map['bodyMeasurements'] is Map) {
+      parsedMeasurements = {};
+      (map['bodyMeasurements'] as Map).forEach((k, v) {
+        if (v is num) {
+          parsedMeasurements![k.toString()] = v;
+        }
+      });
+    }
+
     return UserModel(
       uid: id ?? map['uid'] as String? ?? '',
       email: map['email'] as String? ?? '',
@@ -39,8 +101,11 @@ class UserModel {
       phone: map['phone'] as String? ?? '',
       avatarUrl: map['avatarUrl'] as String? ?? '',
       defaultAddress: map['defaultAddress'] as String? ?? '',
-      role: map['role'] as String? ?? 'customer',
+      role: (map['role'] as String?)?.toLowerCase() ?? 'customer',
       createdAt: parseDate(map['createdAt']),
+      savedAddresses: parsedAddresses,
+      wishlistProductIds: parsedWishlist,
+      bodyMeasurements: parsedMeasurements,
     );
   }
 
@@ -54,6 +119,9 @@ class UserModel {
       'defaultAddress': defaultAddress,
       'role': role,
       'createdAt': Timestamp.fromDate(createdAt),
+      'savedAddresses': savedAddresses,
+      'wishlistProductIds': wishlistProductIds,
+      'bodyMeasurements': bodyMeasurements,
     };
   }
 
@@ -66,6 +134,9 @@ class UserModel {
     String? defaultAddress,
     String? role,
     DateTime? createdAt,
+    List<Map<String, dynamic>>? savedAddresses,
+    List<String>? wishlistProductIds,
+    Map<String, num>? bodyMeasurements,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -76,6 +147,19 @@ class UserModel {
       defaultAddress: defaultAddress ?? this.defaultAddress,
       role: role ?? this.role,
       createdAt: createdAt ?? this.createdAt,
+      savedAddresses: savedAddresses ?? this.savedAddresses,
+      wishlistProductIds: wishlistProductIds ?? this.wishlistProductIds,
+      bodyMeasurements: bodyMeasurements ?? this.bodyMeasurements,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is UserModel &&
+          runtimeType == other.runtimeType &&
+          uid == other.uid);
+
+  @override
+  int get hashCode => uid.hashCode;
 }

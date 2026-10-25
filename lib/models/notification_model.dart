@@ -2,12 +2,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Model thông báo người dùng (Collection `notifications`)
 class NotificationModel {
+  static const String typeOrderUpdate = 'ORDER_UPDATE';
+  static const String typePromotion = 'PROMOTION';
+  static const String typeSystem = 'SYSTEM';
+
   final String id;
   final String userId;
   final String title;
   final String body;
   final bool isRead;
   final DateTime createdAt;
+  final String? orderId; // Mã đơn hàng liên quan (để điều hướng khi bấm vào)
+  final String type; // Loại thông báo: ORDER_UPDATE, PROMOTION, SYSTEM
 
   const NotificationModel({
     required this.id,
@@ -16,7 +22,12 @@ class NotificationModel {
     required this.body,
     this.isRead = false,
     required this.createdAt,
+    this.orderId,
+    this.type = typeSystem,
   });
+
+  /// Kiểm tra có phải thông báo liên quan đến đơn hàng hay không
+  bool get isOrderNotification => orderId != null && orderId!.isNotEmpty;
 
   factory NotificationModel.fromMap(Map<String, dynamic> map, [String? id]) {
     DateTime parseDate(dynamic date) {
@@ -33,6 +44,8 @@ class NotificationModel {
       body: map['body'] as String? ?? '',
       isRead: map['isRead'] as bool? ?? false,
       createdAt: parseDate(map['createdAt']),
+      orderId: map['orderId'] as String?,
+      type: map['type'] as String? ?? typeSystem,
     );
   }
 
@@ -44,6 +57,8 @@ class NotificationModel {
       'body': body,
       'isRead': isRead,
       'createdAt': Timestamp.fromDate(createdAt),
+      'orderId': orderId,
+      'type': type,
     };
   }
 
@@ -54,6 +69,8 @@ class NotificationModel {
     String? body,
     bool? isRead,
     DateTime? createdAt,
+    String? orderId,
+    String? type,
   }) {
     return NotificationModel(
       id: id ?? this.id,
@@ -62,6 +79,18 @@ class NotificationModel {
       body: body ?? this.body,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
+      orderId: orderId ?? this.orderId,
+      type: type ?? this.type,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NotificationModel &&
+          runtimeType == other.runtimeType &&
+          id == other.id);
+
+  @override
+  int get hashCode => id.hashCode;
 }
