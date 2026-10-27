@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/product_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/product_provider.dart';
 import 'product_detail_screen.dart';
 import '../admin/shop_admin_screen.dart';
@@ -28,11 +31,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
   @override
   Widget build(BuildContext context) {
     final productProvider = context.watch<ProductProvider>();
+    final authProvider = context.watch<AuthProvider>();
     final products = productProvider.filteredProducts;
 
-    return RefreshIndicator(
-      color: AppColors.primary,
-      onRefresh: () => productProvider.loadData(),
+    return Material(
+      color: Colors.white,
+      child: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => productProvider.loadData(),
       child: CustomScrollView(
         slivers: [
           // 1. THANH TÌM KIẾM TỨC THÌ (Real-time Search) & NÚT BỘ LỌC NÂNG CAO
@@ -202,57 +208,66 @@ class _ProductListScreenState extends State<ProductListScreen> {
               ),
             ),
 
-          // 2. BANNER QUẢNG CÁO PHONG CÁCH UNIQLO LIFEWEAR
+          // 2. BANNER QUẢNG CÁO PHONG CÁCH UNIQLO LIFEWEAR (GẮN KHO VOUCHER)
           SliverToBoxAdapter(
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: AppColors.black,
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _showVouchersModal(context),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                          child: const Text(
-                            'BỘ SƯU TẬP MỚI',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                                child: const Text(
+                                  'BỘ SƯU TẬP MỚI',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'LIFEWEAR 2026\nĐƠN GIẢN MÀ ĐẲNG CẤP',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                  height: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              const Text(
+                                'Mã SALE10 giảm 10% • FREESHIP giảm 30k • Chạm xem kho Voucher ➔',
+                                style: TextStyle(color: Colors.white70, fontSize: 11),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'LIFEWEAR 2026\nĐƠN GIẢN MÀ ĐẲNG CẤP',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                            height: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Mã SALE10 giảm 10% • FREESHIP giảm 30k',
-                          style: TextStyle(color: Colors.white70, fontSize: 11),
-                        ),
+                        const Icon(Icons.confirmation_num_outlined, color: Colors.white70, size: 22),
                       ],
                     ),
                   ),
-                  const Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 18),
-                ],
+                ),
               ),
             ),
           ),
@@ -324,14 +339,15 @@ class _ProductListScreenState extends State<ProductListScreen> {
             ),
           ),
 
-          // 5. GRIDVIEW SẢN PHẨM HOẶC TRẠNG THÁI RỖNG
+          // 5. GRIDVIEW SẢN PHẨM HOẶC TRẠNG THÁI RỖNG (KHÓA BẪY 14)
           if (productProvider.isLoading && products.isEmpty)
             const SliverFillRemaining(
               child: Center(
                 child: CircularProgressIndicator(color: AppColors.primary),
               ),
             )
-          else if (products.isEmpty)
+          else if (productProvider.allProducts.isEmpty)
+            // Trường hợp 1: Firestore chưa có dữ liệu sản phẩm nào
             SliverFillRemaining(
               child: Center(
                 child: Padding(
@@ -339,34 +355,103 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
+                      Icon(
+                        authProvider.isAdmin
+                            ? Icons.inventory_2_outlined
+                            : Icons.storefront_outlined,
+                        size: 64,
+                        color: Colors.grey[400],
+                      ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'Chưa có dữ liệu sản phẩm trên Firestore',
-                        style: TextStyle(
-                          fontSize: 15,
+                      Text(
+                        authProvider.isAdmin
+                            ? 'Chưa có dữ liệu sản phẩm trên Firestore'
+                            : 'Cửa hàng đang chuẩn bị sản phẩm mới',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
+                      Text(
+                        authProvider.isAdmin
+                            ? 'Hãy bấm nút bên dưới để tự động nạp 8 sản phẩm mẫu Unsplash vào hệ thống:'
+                            : 'Bộ sưu tập thời trang đang được cập nhật, quý khách vui lòng quay lại sau ít phút!',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 16),
+                      if (authProvider.isAdmin)
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const ShopAdminScreen()),
+                            );
+                          },
+                          icon: const Icon(Icons.cloud_upload_outlined),
+                          label: const Text('Mở Admin Tool & Nạp Seed Data'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        )
+                      else
+                        OutlinedButton.icon(
+                          onPressed: () => productProvider.loadData(),
+                          icon: const Icon(Icons.refresh, size: 18),
+                          label: const Text('Tải lại trang'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.black,
+                            side: const BorderSide(color: AppColors.black),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else if (products.isEmpty)
+            // Trường hợp 2: Có sản phẩm nhưng bộ lọc / tìm kiếm không khớp
+            SliverFillRemaining(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off_outlined, size: 64, color: Colors.grey[400]),
+                      const SizedBox(height: 12),
                       const Text(
-                        'Hãy bấm nút bên dưới để tự động nạp 8 sản phẩm mẫu Unsplash vào hệ thống:',
+                        'Không tìm thấy sản phẩm phù hợp',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Không tìm thấy sản phẩm nào khớp với bộ lọc hoặc từ khóa tìm kiếm của bạn.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const ShopAdminScreen()),
-                          );
+                          _searchController.clear();
+                          productProvider.resetFilters();
                         },
-                        icon: const Icon(Icons.cloud_upload_outlined),
-                        label: const Text('Mở Admin Tool & Nạp Seed Data'),
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Xóa bộ lọc & Tìm lại'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: AppColors.black,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(4),
@@ -391,7 +476,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final product = products[index];
-                    return _buildProductCard(context, product);
+                    return _buildProductCard(context, product, authProvider);
                   },
                   childCount: products.length,
                 ),
@@ -399,7 +484,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
             ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildCategoryChip({
@@ -430,7 +516,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
     );
   }
 
-  Widget _buildProductCard(BuildContext context, ProductModel product) {
+  Widget _buildProductCard(
+    BuildContext context,
+    ProductModel product,
+    AuthProvider authProvider,
+  ) {
+    final isFav = authProvider.isFavorite(product.id);
+    final isOutOfStock = product.effectiveStock <= 0 || !product.isActive;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -468,7 +561,95 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
                     ),
                   ),
-                  // Rating Badge
+
+                  // Huy hiệu giảm giá (Top Left)
+                  if (product.hasDiscount && product.discountPercent > 0)
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: Text(
+                          '-${product.discountPercent}%',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Nút thả tim Yêu thích Wishlist (Top Right - Bẫy 16)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () {
+                          if (!authProvider.isAuthenticated) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Vui lòng đăng nhập để lưu sản phẩm yêu thích!'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
+                          authProvider.toggleWishlist(product.id);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            shape: BoxShape.circle,
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black12, blurRadius: 4),
+                            ],
+                          ),
+                          child: Icon(
+                            isFav ? Icons.favorite : Icons.favorite_border,
+                            size: 16,
+                            color: isFav ? AppColors.primary : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Lớp phủ thông báo Hết hàng (Overlay khi out of stock)
+                  if (isOutOfStock)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        alignment: Alignment.center,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.circular(3),
+                            border: Border.all(color: Colors.white70),
+                          ),
+                          child: const Text(
+                            'HẾT HÀNG',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Rating Badge (Bottom Left)
                   Positioned(
                     bottom: 6,
                     left: 6,
@@ -515,17 +696,213 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
           const SizedBox(height: 4),
 
-          // Giá tiền VND màu đỏ Uniqlo
+          // Giá tiền VND màu đỏ Uniqlo & Giá gốc nếu có
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                AppFormatters.formatCurrency(product.price),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.priceHighlight,
+                ),
+              ),
+              if (product.hasDiscount && product.originalPrice != null) ...[
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    AppFormatters.formatCurrency(product.originalPrice!),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textMuted,
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 2),
+
+          // Lượt bán thực tế
           Text(
-            AppFormatters.formatCurrency(product.price),
+            'Đã bán ${product.soldCount}',
             style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: AppColors.priceHighlight,
+              fontSize: 11,
+              color: AppColors.textMuted,
             ),
           ),
         ],
       ),
+    );
+  }
+
+  void _showVouchersModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.confirmation_num_outlined, color: AppColors.primary, size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'KHO VOUCHER KHUYẾN MÃI',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Sao chép mã voucher và áp dụng tại bước thanh toán để nhận ưu đãi tốt nhất:',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: AppConstants.voucherRules.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, idx) {
+                      final voucher = AppConstants.voucherRules[idx];
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.ultraLightGrey,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: voucher.isShippingVoucher
+                                ? Colors.blue.shade200
+                                : AppColors.primary.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: voucher.isShippingVoucher ? Colors.blue.shade700 : AppColors.primary,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                voucher.discountLabel,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        voucher.code,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.0,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          '(${voucher.name})',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    voucher.description,
+                                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            OutlinedButton(
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: voucher.code));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Đã sao chép mã ${voucher.code} vào bộ nhớ tạm!'),
+                                    duration: const Duration(seconds: 2),
+                                    backgroundColor: AppColors.black,
+                                  ),
+                                );
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.black,
+                                side: const BorderSide(color: AppColors.black, width: 0.8),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text('Sao chép', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

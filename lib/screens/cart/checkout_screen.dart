@@ -7,13 +7,15 @@ import '../../core/utils/formatters.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../models/cart_item_model.dart';
 import '../map/store_map_screen.dart';
 import '../main_nav_screen.dart';
 import 'widgets/vietqr_dialog.dart';
 
 /// Màn hình Thanh toán & Xác nhận đơn hàng (COD / VietQR)
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({super.key});
+  final List<CartItemModel>? directBuyItems;
+  const CheckoutScreen({super.key, this.directBuyItems});
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -34,7 +36,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final auth = context.read<AuthProvider>();
     _nameController.text = auth.userFullName;
     _phoneController.text = auth.userModel?.phone ?? '';
-    _addressController.text = auth.userModel?.defaultAddress ?? '';
+    _addressController.text = auth.effectiveDefaultAddress.isNotEmpty
+        ? auth.effectiveDefaultAddress
+        : (auth.userModel?.defaultAddress ?? '');
   }
 
   @override
@@ -47,7 +51,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _handlePlaceOrder() async {
     final cartProvider = context.read<CartProvider>();
-    if (cartProvider.items.isEmpty) {
+    final effectiveItems = widget.directBuyItems ?? cartProvider.items;
+    if (effectiveItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('⚠️ Giỏ hàng của bạn đang trống!'),
@@ -64,18 +69,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final authProvider = context.read<AuthProvider>();
     final orderProvider = context.read<OrderProvider>();
 
-    // Lưu lại tổng tiền trước khi giỏ hàng bị xóa (clearCart)
-    final totalPaid = cartProvider.totalPrice;
+    final subtotal = widget.directBuyItems != null
+        ? widget.directBuyItems!.fold<num>(0, (sum, i) => sum + i.itemTotal)
+        : cartProvider.subtotal;
+    final totalPaid = widget.directBuyItems != null
+        ? subtotal
+        : cartProvider.totalPrice;
+    final voucher = widget.directBuyItems != null ? '' : cartProvider.voucherCode;
+    final discount = widget.directBuyItems != null ? 0 : cartProvider.discountAmount;
 
     final orderId = await orderProvider.createOrder(
       userId: authProvider.userId.isNotEmpty ? authProvider.userId : 'guest_user',
       userName: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
       shippingAddress: _addressController.text.trim(),
-      items: cartProvider.items,
-      subtotal: cartProvider.subtotal,
-      voucherCode: cartProvider.voucherCode,
-      discountAmount: cartProvider.discountAmount,
+      items: effectiveItems,
+      subtotal: subtotal,
+      voucherCode: voucher,
+      discountAmount: discount,
       totalPrice: totalPaid,
       paymentMethod: _paymentMethod,
     );
@@ -93,7 +104,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _isSubmitting = false);
 
     if (orderId != null) {
-      cartProvider.clearCart();
+      if (widget.directBuyItems == null) {
+        cartProvider.clearCart();
+      }
 
       if (_paymentMethod == 'VIETQR') {
         showDialog(
@@ -451,7 +464,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             const SizedBox(height: 12),
 
-            ...cartProvider.items.map((item) => Padding(
+            ...((widget.directBuyItems ?? cartProvider.items).map((item) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -468,17 +481,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                     ],
                   ),
-                )),
+                ))),
             const Divider(height: 24),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Tạm tính:', style: TextStyle(color: AppColors.textSecondary)),
-                Text(AppFormatters.formatCurrency(cartProvider.subtotal)),
+                Text(AppFormatters.formatCurrency(
+                  widget.directBuyItems != null
+                      ? widget.directBuyItems!.fold<num>(0, (sum, i) => sum + i.itemTotal)
+                      : cartProvider.subtotal,
+                )),
               ],
             ),
-            if (cartProvider.discountAmount > 0) ...[
+            if (widget.directBuyItems == null && cartProvider.discountAmount > 0) ...[
               const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -499,7 +516,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 const Text('Tổng thanh toán:',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 Text(
-                  AppFormatters.formatCurrency(cartProvider.totalPrice),
+                  AppFormatters.formatCurrency(
+                    widget.directBuyItems != null
+                        ? widget.directBuyItems!.fold<num>(0, (sum, i) => sum + i.itemTotal)
+                        : cartProvider.totalPrice,
+                  ),
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
