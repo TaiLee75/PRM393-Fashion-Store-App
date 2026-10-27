@@ -4,11 +4,14 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/order_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../providers/product_provider.dart';
 import '../cart/widgets/vietqr_dialog.dart';
+import '../main_nav_screen.dart';
 import 'order_detail_screen.dart';
 
-/// Màn hình Lịch sử đơn hàng của khách hàng
+/// Màn hình Lịch sử đơn hàng của khách hàng (Task 3.5: Khóa Bẫy 8, 16, 20)
 class OrderHistoryScreen extends StatefulWidget {
   const OrderHistoryScreen({super.key});
 
@@ -25,8 +28,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = context.read<AuthProvider>();
-      if (auth.userId.isNotEmpty) {
+      final auth = Provider.of<AuthProvider?>(context, listen: false);
+      if (auth != null && auth.userId.isNotEmpty) {
         context.read<OrderProvider>().listenUserOrders(auth.userId);
       }
     });
@@ -36,6 +39,58 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Xử lý Mua lại đơn này: Kiểm tra tồn kho và thêm vào Giỏ hàng
+  Future<void> _handleReorder(OrderModel order) async {
+    final cartProvider = Provider.of<CartProvider?>(context, listen: false);
+    final productProvider = Provider.of<ProductProvider?>(context, listen: false);
+    if (cartProvider == null) return;
+
+    int addedCount = 0;
+    for (final item in order.items) {
+      int? maxStock;
+      if (productProvider != null) {
+        final product = productProvider.allProducts.where((p) => p.id == item.productId).firstOrNull;
+        if (product != null) {
+          if (!product.isActive) continue; // Bỏ qua sản phẩm ngừng kinh doanh
+          maxStock = product.getStockForVariant(item.size, item.color);
+          if (maxStock <= 0) continue; // Hết hàng phân loại này
+        }
+      }
+
+      cartProvider.addItem(item.copyWith(isSelected: true), maxStock);
+      addedCount++;
+    }
+
+    if (!mounted) return;
+
+    if (addedCount > 0) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã thêm $addedCount sản phẩm từ đơn hàng vào giỏ!'),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'XEM GIỎ HÀNG',
+            textColor: Colors.white,
+            onPressed: () {
+              MainNavScreen.switchToTab(context, 1); // Tab 1: Giỏ hàng
+            },
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Các sản phẩm trong đơn hiện đã hết hàng hoặc ngừng kinh doanh!'),
+          backgroundColor: AppColors.warning,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   @override
@@ -72,10 +127,13 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       );
     }
 
-    // Tính toán số lượng đơn theo từng trạng thái
-    final pendingCount = rawOrders.where((o) => o.status == 'Pending').length;
-    final deliveringCount = rawOrders.where((o) => o.status == 'Delivering').length;
-    final deliveredCount = rawOrders.where((o) => o.status == 'Delivered').length;
+    // Đếm số lượng đơn theo 6 trạng thái nghiệp vụ chuẩn
+    final pendingCount = rawOrders.where((o) => o.status == OrderModel.statusPending).length;
+    final deliveringCount = rawOrders.where((o) => o.status == OrderModel.statusDelivering).length;
+    final deliveredCount = rawOrders.where((o) => o.status == OrderModel.statusDelivered).length;
+    final returnRequestedCount = rawOrders.where((o) => o.status == OrderModel.statusReturnRequested).length;
+    final returnedCount = rawOrders.where((o) => o.status == OrderModel.statusReturned).length;
+    final cancelledCount = rawOrders.where((o) => o.status == OrderModel.statusCancelled).length;
 
     // Lọc danh sách theo chip trạng thái & từ khóa tìm kiếm
     final filteredOrders = rawOrders.where((order) {
@@ -102,6 +160,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           pendingCount: pendingCount,
           deliveringCount: deliveringCount,
           deliveredCount: deliveredCount,
+          returnRequestedCount: returnRequestedCount,
+          returnedCount: returnedCount,
+          cancelledCount: cancelledCount,
         ),
         const Divider(height: 1, thickness: 1, color: AppColors.border),
         Expanded(
@@ -110,8 +171,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
               : RefreshIndicator(
                   color: AppColors.primary,
                   onRefresh: () async {
-                    final auth = context.read<AuthProvider>();
-                    if (auth.userId.isNotEmpty) {
+                    final auth = Provider.of<AuthProvider?>(context, listen: false);
+                    if (auth != null && auth.userId.isNotEmpty) {
                       context.read<OrderProvider>().listenUserOrders(auth.userId);
                     }
                   },
@@ -135,6 +196,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     required int pendingCount,
     required int deliveringCount,
     required int deliveredCount,
+    required int returnRequestedCount,
+    required int returnedCount,
+    required int cancelledCount,
   }) {
     return Container(
       color: AppColors.white,
@@ -175,7 +239,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          // 2. Hàng Chip lọc trạng thái
+          // 2. Hàng Chip lọc 6 trạng thái + Tất cả
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -188,24 +252,45 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 ),
                 const SizedBox(width: 8),
                 _buildStatusChip(
-                  key: 'Pending',
+                  key: OrderModel.statusPending,
                   label: 'Chờ xác nhận',
                   count: pendingCount,
                   activeColor: AppColors.warning,
                 ),
                 const SizedBox(width: 8),
                 _buildStatusChip(
-                  key: 'Delivering',
+                  key: OrderModel.statusDelivering,
                   label: 'Đang giao',
                   count: deliveringCount,
                   activeColor: Colors.blue.shade700,
                 ),
                 const SizedBox(width: 8),
                 _buildStatusChip(
-                  key: 'Delivered',
+                  key: OrderModel.statusDelivered,
                   label: 'Đã giao',
                   count: deliveredCount,
                   activeColor: AppColors.success,
+                ),
+                const SizedBox(width: 8),
+                _buildStatusChip(
+                  key: OrderModel.statusReturnRequested,
+                  label: 'Yêu cầu đổi/trả',
+                  count: returnRequestedCount,
+                  activeColor: Colors.amber.shade800,
+                ),
+                const SizedBox(width: 8),
+                _buildStatusChip(
+                  key: OrderModel.statusReturned,
+                  label: 'Đã hoàn trả',
+                  count: returnedCount,
+                  activeColor: Colors.purple.shade700,
+                ),
+                const SizedBox(width: 8),
+                _buildStatusChip(
+                  key: OrderModel.statusCancelled,
+                  label: 'Đã hủy',
+                  count: cancelledCount,
+                  activeColor: AppColors.error,
                 ),
               ],
             ),
@@ -330,20 +415,42 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     Color statusColor;
     String statusText;
     switch (order.status) {
-      case 'Delivering':
+      case OrderModel.statusDelivering:
         statusColor = Colors.blue;
         statusText = 'Đang giao hàng';
         break;
-      case 'Delivered':
+      case OrderModel.statusDelivered:
         statusColor = AppColors.success;
         statusText = 'Đã giao thành công';
         break;
-      case 'Pending':
+      case OrderModel.statusReturnRequested:
+        statusColor = Colors.amber.shade800;
+        statusText = 'Yêu cầu đổi/trả';
+        break;
+      case OrderModel.statusReturned:
+        statusColor = Colors.purple.shade700;
+        statusText = 'Đã hoàn trả';
+        break;
+      case OrderModel.statusCancelled:
+        statusColor = AppColors.error;
+        statusText = 'Đã hủy đơn';
+        break;
+      case OrderModel.statusPending:
       default:
         statusColor = AppColors.warning;
         statusText = 'Chờ xác nhận';
         break;
     }
+
+    // Khóa Bẫy 8 & 16: Điều kiện hiển thị nút mở VietQR
+    final canShowVietQrButton = order.isVietQr &&
+        (order.status == OrderModel.statusPending || order.status == OrderModel.statusDelivering) &&
+        order.paymentStatus == OrderModel.paymentUnpaid;
+
+    // Điều kiện hiển thị nút "Mua lại đơn này"
+    final canReorder = order.status == OrderModel.statusDelivered ||
+        order.status == OrderModel.statusCancelled ||
+        order.status == OrderModel.statusReturned;
 
     return InkWell(
       onTap: () {
@@ -372,6 +479,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Tiêu đề: Mã đơn & Trạng thái vận hành
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -396,12 +504,22 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Thời gian: ${AppFormatters.formatDateTime(order.createdAt)}',
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            const SizedBox(height: 6),
+
+            // Thời gian đặt & Badge trạng thái thanh toán (Khóa Bẫy 16)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Thời gian: ${AppFormatters.formatDateTime(order.createdAt)}',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                _buildPaymentBadge(order),
+              ],
             ),
             const Divider(height: 18),
+
+            // Danh sách các món trong đơn
             ...order.items.map((item) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 3),
                   child: Row(
@@ -421,6 +539,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                   ),
                 )),
             const Divider(height: 18),
+
+            // Phương thức thanh toán & Tổng giá trị đơn hàng
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -438,7 +558,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 ),
               ],
             ),
-            if (order.paymentMethod == 'VIETQR') ...[
+
+            // NÚT MỞ MÃ QR THANH TOÁN (Khóa Bẫy 8 & 16: Chỉ hiện khi thỏa mãn điều kiện)
+            if (canShowVietQrButton) ...[
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -449,6 +571,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                       builder: (_) => VietQrPaymentDialog(
                         orderId: order.orderId,
                         totalPrice: order.totalPrice,
+                        isFromCheckout: false,
                       ),
                     );
                   },
@@ -469,6 +592,32 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 ),
               ),
             ],
+
+            // NÚT MUA LẠI ĐƠN NÀY (Dành cho đơn Delivered, Cancelled, Returned)
+            if (canReorder) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _handleReorder(order),
+                  icon: const Icon(Icons.replay, size: 18, color: AppColors.black),
+                  label: const Text(
+                    'Mua lại đơn này',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.black,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.black),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  ),
+                ),
+              ),
+            ],
+
             const SizedBox(height: 8),
             const Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -489,5 +638,114 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         ),
       ),
     );
+  }
+
+  /// Badge hiển thị trạng thái dòng tiền minh bạch (Khóa Bẫy 16)
+  Widget _buildPaymentBadge(OrderModel order) {
+    if (order.isPaymentSubmitted) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.orange.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.hourglass_top, size: 12, color: Colors.orange.shade800),
+            const SizedBox(width: 3),
+            Text(
+              'Chờ duyệt CK',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.orange.shade800,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (order.isPaid) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.green.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle, size: 12, color: Colors.green.shade800),
+            const SizedBox(width: 3),
+            Text(
+              'Đã thanh toán',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.green.shade800,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (order.isRefunded) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.purple.shade50,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.purple.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.currency_exchange, size: 12, color: Colors.purple.shade800),
+            const SizedBox(width: 3),
+            Text(
+              'Đã hoàn tiền',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.purple.shade800,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (order.isVietQr && order.paymentStatus == OrderModel.paymentUnpaid) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.red.shade200),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.payment, size: 12, color: Colors.red.shade700),
+            const SizedBox(width: 3),
+            Text(
+              'Chưa thanh toán',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.red.shade700,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }
