@@ -68,6 +68,26 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _showForgotPasswordBottomSheet() async {
+    final email = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => _ForgotPasswordBottomSheet(
+        initialEmail: _emailController.text.trim(),
+      ),
+    );
+
+    if (email != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('📧 Đã gửi liên kết khôi phục tới $email!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
@@ -219,7 +239,29 @@ class _LoginScreenState extends State<LoginScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
+
+                  // Quên mật khẩu?
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _showForgotPasswordBottomSheet,
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(50, 30),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Quên mật khẩu?',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
                   // Nút Đăng nhập thông thường (ElevatedButton)
                   ElevatedButton(
@@ -344,3 +386,157 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
+class _ForgotPasswordBottomSheet extends StatefulWidget {
+  final String initialEmail;
+  const _ForgotPasswordBottomSheet({required this.initialEmail});
+
+  @override
+  State<_ForgotPasswordBottomSheet> createState() => _ForgotPasswordBottomSheetState();
+}
+
+class _ForgotPasswordBottomSheetState extends State<_ForgotPasswordBottomSheet> {
+  late final TextEditingController _resetEmailController;
+  final _resetFormKey = GlobalKey<FormState>();
+  bool _isSending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resetEmailController = TextEditingController(text: widget.initialEmail);
+  }
+
+  @override
+  void dispose() {
+    _resetEmailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSendResetLink() async {
+    if (!_resetFormKey.currentState!.validate()) return;
+    setState(() => _isSending = true);
+
+    final email = _resetEmailController.text.trim();
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.sendPasswordResetEmail(email);
+
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.pop(context, email);
+    } else {
+      setState(() => _isSending = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            authProvider.errorMessage ?? 'Không thể gửi email đặt lại mật khẩu',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(
+        top: 24,
+        left: 24,
+        right: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Form(
+        key: _resetFormKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'QUÊN MẬT KHẨU',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.1,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Nhập email tài khoản của bạn để nhận liên kết đặt lại mật khẩu từ hệ thống.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _resetEmailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Email của bạn *',
+                  hintText: 'vidu@gmail.com',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Vui lòng nhập email';
+                  }
+                  if (!value.contains('@')) {
+                    return 'Email không hợp lệ';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _isSending ? null : _handleSendResetLink,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                child: _isSending
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'GỬI LIÊN KẾT ĐẶT LẠI MẬT KHẨU',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

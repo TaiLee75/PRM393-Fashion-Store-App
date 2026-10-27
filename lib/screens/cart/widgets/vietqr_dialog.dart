@@ -91,60 +91,10 @@ class _VietQrPaymentDialogState extends State<VietQrPaymentDialog> {
   }
 
   Future<void> _showSubmitTransactionDialog() async {
-    final refController = TextEditingController();
-
-    final String? result;
-    try {
-      result = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          title: const Row(
-            children: [
-              Icon(Icons.receipt_long, color: AppColors.primary, size: 22),
-              SizedBox(width: 8),
-              Text('Xác nhận đã chuyển khoản', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Vui lòng nhập Mã giao dịch / Mã tham chiếu từ ứng dụng ngân hàng của bạn (không bắt buộc):',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: refController,
-                decoration: const InputDecoration(
-                  labelText: 'Mã giao dịch ngân hàng',
-                  hintText: 'VD: FT26012345678',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Hủy', style: TextStyle(color: AppColors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, refController.text.trim()),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Xác nhận gửi'),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      refController.dispose();
-    }
+    final String? result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => const _SubmitTransactionDialog(),
+    );
 
     if (result != null && mounted) {
       setState(() => _isSubmittingPayment = true);
@@ -557,3 +507,75 @@ class _VietQrPaymentDialogState extends State<VietQrPaymentDialog> {
     );
   }
 }
+
+class _SubmitTransactionDialog extends StatefulWidget {
+  const _SubmitTransactionDialog();
+
+  @override
+  State<_SubmitTransactionDialog> createState() => _SubmitTransactionDialogState();
+}
+
+class _SubmitTransactionDialogState extends State<_SubmitTransactionDialog> {
+  late final TextEditingController _refController;
+
+  @override
+  void initState() {
+    super.initState();
+    _refController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _refController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      title: const Row(
+        children: [
+          Icon(Icons.receipt_long, color: AppColors.primary, size: 22),
+          SizedBox(width: 8),
+          Text('Xác nhận đã chuyển khoản', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Vui lòng nhập Mã giao dịch / Mã tham chiếu từ ứng dụng ngân hàng của bạn (không bắt buộc):',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _refController,
+            decoration: const InputDecoration(
+              labelText: 'Mã giao dịch ngân hàng',
+              hintText: 'VD: FT26012345678',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Hủy', style: TextStyle(color: AppColors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _refController.text.trim()),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Xác nhận gửi'),
+        ),
+      ],
+    );
+  }
+}
+

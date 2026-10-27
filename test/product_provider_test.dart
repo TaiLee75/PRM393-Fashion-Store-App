@@ -312,5 +312,41 @@ void main() {
       expect(fail, isFalse);
       expect(productProvider.errorMessage, contains('Số lượng nhập kho phải lớn hơn 0'));
     });
+
+    test('19. ProductProvider.availableSizes chứa đầy đủ các size chuẩn bao gồm FreeSize (Khóa Bẫy 12)', () {
+      expect(productProvider.availableSizes, containsAll(['S', 'M', 'L', 'XL', 'FreeSize']));
+    });
+
+    test('20. Phân bổ tồn kho biến thể SKU khi nhập kho chung (skuKey == null)', () async {
+      // Thiết lập sản phẩm có sẵn 2 SKU: S_Đen: 10, M_Đen: 10
+      const multiVariantProduct = ProductModel(
+        id: 'prod_multi_var',
+        name: 'Áo Thun Multi Variant',
+        categoryId: 'cat_aothun',
+        price: 200000,
+        description: 'Mô tả test',
+        imageUrls: ['https://example.com/test.jpg'],
+        sizes: ['S', 'M'],
+        colors: ['Đen'],
+        stock: 20,
+        variantStock: {'S_Đen': 10, 'M_Đen': 10},
+        isActive: true,
+      );
+      productProvider.setMockProducts([multiVariantProduct]);
+
+      // Nhập thêm 15 cái vào kho chung (skuKey == null)
+      // 15 chia cho 2 SKU: mỗi SKU +7, dư 1 chia cho SKU đầu tiên -> S_Đen +8 = 18, M_Đen +7 = 17
+      final ok = await productProvider.quickRestockProduct(
+        productId: 'prod_multi_var',
+        additionalStock: 15,
+        skuKey: null,
+      );
+      expect(ok, isTrue);
+
+      final updated = productProvider.findById('prod_multi_var')!;
+      expect(updated.stock, 35); // 20 + 15 = 35
+      expect(updated.variantStock['S_Đen'], 18);
+      expect(updated.variantStock['M_Đen'], 17);
+    });
   });
 }
