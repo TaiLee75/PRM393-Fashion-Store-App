@@ -65,6 +65,8 @@ void main() {
   ];
 
   final now = DateTime.now();
+  final todayStart = DateTime(now.year, now.month, now.day);
+  final todayTime = todayStart.add(const Duration(minutes: 30));
 
   final List<OrderModel> mockOrders = [
     // 2 đơn Delivered (Một đơn hôm nay, một đơn 3 ngày trước)
@@ -89,7 +91,7 @@ void main() {
       subtotal: 600000,
       totalPrice: 600000,
       status: OrderModel.statusDelivered,
-      createdAt: now.subtract(const Duration(hours: 2)), // Hôm nay
+      createdAt: todayTime, // Hôm nay
     ),
     OrderModel(
       orderId: 'ORD_DELIVERED_02',
@@ -112,7 +114,7 @@ void main() {
       subtotal: 400000,
       totalPrice: 400000,
       status: OrderModel.statusDelivered,
-      createdAt: now.subtract(const Duration(days: 3)), // 3 ngày trước
+      createdAt: todayStart.subtract(const Duration(days: 3)), // 3 ngày trước
     ),
     // 1 đơn Pending
     OrderModel(
@@ -125,7 +127,7 @@ void main() {
       subtotal: 500000,
       totalPrice: 500000,
       status: OrderModel.statusPending,
-      createdAt: now.subtract(const Duration(hours: 1)),
+      createdAt: todayTime,
     ),
     // 1 đơn Delivering
     OrderModel(
@@ -138,7 +140,7 @@ void main() {
       subtotal: 300000,
       totalPrice: 300000,
       status: OrderModel.statusDelivering,
-      createdAt: now.subtract(const Duration(days: 1)),
+      createdAt: todayStart.subtract(const Duration(days: 1)),
     ),
     // 1 đơn Cancelled (Khóa Bẫy 5: Không được cộng vào Doanh thu thực thu)
     OrderModel(
@@ -151,7 +153,7 @@ void main() {
       subtotal: 200000,
       totalPrice: 200000,
       status: OrderModel.statusCancelled,
-      createdAt: now.subtract(const Duration(hours: 4)),
+      createdAt: todayTime,
     ),
     // 1 đơn ReturnRequested (Khóa Bẫy 5: Không được cộng vào Doanh thu thực thu)
     OrderModel(

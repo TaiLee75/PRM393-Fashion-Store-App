@@ -301,10 +301,10 @@ graph TD
   - [x] **Widget Cảnh báo Tồn kho thấp / Hết hàng:** Liệt kê các sản phẩm có `stock <= 5` hoặc có biến thể bị hết hàng kèm nút nhập kho nhanh.
   - [x] **Bảng xếp hạng Top 5 Sản phẩm Bán chạy nhất (Best Sellers):** Xếp hạng theo `soldCount`.
 
-- [ ] **Task 4.2: Nâng cấp Tab Duyệt Đơn hàng Admin (`ShopAdminScreen`)**
-  - [ ] Hiển thị chi tiết từng mặt hàng (Ảnh, Tên, Size, Màu, Số lượng), hình thức nhận hàng (`Giao tận nơi` / `Nhận tại cửa hàng`), ghi chú của khách, và trạng thái thanh toán ngay trên thẻ đơn hàng.
-  - [ ] Bấm vào thẻ đơn hàng để mở `OrderDetailScreen` với đầy đủ quyền Admin.
-  - [ ] Bộ nút điều khiển trạng thái:
+- [x] **Task 4.2: Nâng cấp Tab Duyệt Đơn hàng Admin (`ShopAdminScreen`)**
+  - [x] Hiển thị chi tiết từng mặt hàng (Ảnh, Tên, Size, Màu, Số lượng), hình thức nhận hàng (`Giao tận nơi` / `Nhận tại cửa hàng`), ghi chú của khách, và trạng thái thanh toán ngay trên thẻ đơn hàng.
+  - [x] Bấm vào thẻ đơn hàng để mở `OrderDetailScreen` với đầy đủ quyền Admin.
+  - [x] Bộ nút điều khiển trạng thái:
     - Đơn VietQR `PaymentSubmitted`: Nút **"Xác nhận đã nhận chuyển khoản"** (`paymentStatus = 'Paid'`) hoặc **"Từ chối / Chưa nhận được"** (`rejectPaymentSubmitted` $\rightarrow$ trả về `'Unpaid'` + báo khách quét lại).
     - Đơn `Pending`: Nút **"Duyệt giao hàng"** (`Delivering` — nếu đơn `VIETQR` chưa `'Paid'` thì bật hộp thoại xác nhận nhắc Admin kiểm tra tiền về trước khi giao) hoặc **"Hủy đơn hàng"** (chọn lý do & hoàn kho SKU).
     - Đơn `Delivering`: Nút **"Xác nhận đã giao thành công"** (`Delivered` + tự động cập nhật `paymentStatus = 'Paid'`).

@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../models/cart_item_model.dart';
 import '../../models/order_model.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../services/firestore_service.dart';
+import '../orders/order_detail_screen.dart';
 import 'admin_branch_management_screen.dart';
 import 'admin_chat_inbox_screen.dart';
 import 'admin_product_list_screen.dart';
@@ -1714,146 +1716,936 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
         statusText = order.status;
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Mã đơn: #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  statusText,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OrderDetailScreen(initialOrder: order),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Khách: ${order.userName} - ${order.phone}',
-            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-          ),
-          Text(
-            'Địa chỉ: ${order.shippingAddress}',
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-          const Divider(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              // 1. Mã đơn hàng & Badge trạng thái vận hành
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '${order.items.length} sản phẩm | PTTT: ${order.paymentMethod}',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  Row(
+                    children: [
+                      const Icon(Icons.receipt_long_outlined, size: 16, color: AppColors.textSecondary),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Mã đơn: #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ],
                   ),
-                  Text(
-                    AppFormatters.formatVND(order.totalPrice),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
               ),
-              if (order.status == 'Pending') ...[
-                ElevatedButton.icon(
-                  onPressed: () {
-                    orderProvider.updateOrderStatus(
-                      orderId: order.orderId,
-                      newStatus: 'Delivering',
-                      userId: order.userId,
-                    );
-                  },
-                  icon: const Icon(Icons.local_shipping_outlined, size: 16),
-                  label: const Text('Giao hàng'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
+              const SizedBox(height: 8),
+
+              // 2. Thông tin khách hàng & Hình thức nhận hàng (Giao tận nơi / Nhận tại quầy)
+              Text(
+                'Khách: ${order.userName} - ${order.phone}',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: order.isPickup ? Colors.orange.shade50 : Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: order.isPickup ? Colors.orange.shade300 : Colors.blue.shade200,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          order.isPickup ? Icons.storefront : Icons.local_shipping_outlined,
+                          size: 12,
+                          color: order.isPickup ? Colors.orange.shade800 : Colors.blue.shade700,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          order.isPickup ? 'Nhận tại quầy' : 'Giao tận nơi',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: order.isPickup ? Colors.orange.shade800 : Colors.blue.shade700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ] else if (order.status == 'Delivering') ...[
-                ElevatedButton.icon(
-                  onPressed: () {
-                    orderProvider.updateOrderStatus(
-                      orderId: order.orderId,
-                      newStatus: 'Delivered',
-                      userId: order.userId,
-                    );
-                  },
-                  icon: const Icon(Icons.check_circle_outline, size: 16),
-                  label: const Text('Hoàn tất'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      order.isPickup
+                          ? (order.pickupBranchName.isNotEmpty
+                              ? 'Chi nhánh: ${order.pickupBranchName}'
+                              : 'Lifewear Flagship Store')
+                          : 'Địa chỉ: ${order.shippingAddress}',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ),
-              ] else if (order.status == 'Delivered') ...[
-                const Text(
-                  '✓ Giao hoàn tất',
-                  style: TextStyle(
-                    color: AppColors.success,
-                    fontWeight: FontWeight.bold,
+                ],
+              ),
+
+              // 3. Ghi chú của khách hàng (nếu có)
+              if (order.note.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.amber.shade200),
                   ),
-                ),
-              ] else if (order.status == 'Cancelled') ...[
-                Text(
-                  '✕ Đã hủy đơn',
-                  style: TextStyle(
-                    color: Colors.red.shade700,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ] else if (order.status == 'ReturnRequested' || order.status == 'Returned') ...[
-                Text(
-                  '⚡ Đổi / Trả hàng',
-                  style: TextStyle(
-                    color: Colors.purple.shade700,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ] else ...[
-                Text(
-                  order.status,
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontWeight: FontWeight.bold,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.edit_note_outlined, size: 16, color: Colors.amber.shade900),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Ghi chú: "${order.note}"',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.amber.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
+
+              // 4. Banner Đối soát Thanh toán VietQR Napas247 (Level 2 Flash Banner)
+              if (order.isPaymentSubmitted) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.amber.shade400, width: 1.2),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.qr_code_scanner, size: 18, color: Colors.amber.shade900),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Khách báo đã chuyển khoản VietQR${order.transactionRef.isNotEmpty ? ' • Mã GD: ${order.transactionRef}' : ''}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton(
+                            onPressed: () => _showRejectPaymentDialog(order, orderProvider),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red.shade700,
+                              side: BorderSide(color: Colors.red.shade300),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                            ),
+                            child: const Text('Từ chối VietQR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              final success = await orderProvider.confirmPaymentPaid(order.orderId);
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(success
+                                      ? 'Đã xác nhận thanh toán thành công (+Paid)'
+                                      : 'Xác nhận thất bại: ${orderProvider.errorMessage}'),
+                                  backgroundColor: success ? AppColors.success : Colors.red,
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.check, size: 14),
+                            label: const Text('Xác nhận đã thu (+Paid)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.success,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // 5. Danh sách sản phẩm rút gọn (Item Details Preview)
+              if (order.items.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    children: [
+                      for (int i = 0; i < order.items.length; i++) ...[
+                        if (i > 0) const Divider(height: 12, thickness: 0.5),
+                        _buildOrderItemPreview(order.items[i]),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+
+              // 6. Lý do đổi/trả nếu ở trạng thái ReturnRequested
+              if (order.status == OrderModel.statusReturnRequested && order.returnReason.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.purple.shade200),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.assignment_return_outlined, size: 16, color: Colors.purple.shade700),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Lý do đổi/trả: "${order.returnReason}"',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.purple.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // 7. Lý do hủy nếu ở trạng thái Cancelled
+              if (order.status == OrderModel.statusCancelled && order.cancelReason.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.cancel_outlined, size: 16, color: Colors.red.shade700),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Lý do hủy: "${order.cancelReason}"${order.cancelledBy.isNotEmpty ? ' (${order.cancelledBy == 'customer' ? 'Khách hủy' : 'Admin hủy'})' : ''}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.red.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const Divider(height: 20),
+
+              // 8. Dòng tổng kết tài chính & Phương thức thanh toán
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            '${order.items.length} sản phẩm | PTTT: ${order.paymentMethod}',
+                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                          const SizedBox(width: 6),
+                          _buildPaymentStatusBadge(order.paymentStatus),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        AppFormatters.formatVND(order.totalPrice),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // 9. Bộ điều khiển hành động theo trạng thái đơn hàng (State Transition Controls)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (order.status == OrderModel.statusPending) ...[
+                    OutlinedButton.icon(
+                      onPressed: () => _showAdminCancelOrderDialog(order, orderProvider),
+                      icon: const Icon(Icons.cancel_outlined, size: 14),
+                      label: const Text('Hủy đơn'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red.shade700,
+                        side: BorderSide(color: Colors.red.shade300),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () => _handleAdminApproveDelivery(order, orderProvider),
+                      icon: const Icon(Icons.local_shipping_outlined, size: 16),
+                      label: const Text('Duyệt giao hàng'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      ),
+                    ),
+                  ] else if (order.status == OrderModel.statusDelivering) ...[
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Xác nhận giao hàng'),
+                            content: Text(
+                              'Xác nhận đơn hàng #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId} đã được giao thành công cho khách hàng?\n'
+                              'Hệ thống sẽ tự động cập nhật trạng thái thanh toán sang "Paid".',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text('Chưa'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
+                                child: const Text('Xác nhận đã giao', style: TextStyle(color: Colors.white)),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true) {
+                          final success = await orderProvider.updateOrderStatus(
+                            orderId: order.orderId,
+                            newStatus: OrderModel.statusDelivered,
+                            userId: order.userId,
+                          );
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(success
+                                  ? 'Đơn hàng đã được giao thành công!'
+                                  : 'Cập nhật thất bại: ${orderProvider.errorMessage}'),
+                              backgroundColor: success ? AppColors.success : Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.check_circle_outline, size: 16),
+                      label: const Text('Xác nhận đã giao'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      ),
+                    ),
+                  ] else if (order.status == OrderModel.statusReturnRequested) ...[
+                    OutlinedButton.icon(
+                      onPressed: () => _showRejectReturnDialog(order, orderProvider),
+                      icon: const Icon(Icons.close, size: 14),
+                      label: const Text('Từ chối Đổi/Trả'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red.shade700,
+                        side: BorderSide(color: Colors.red.shade300),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () => _showApproveReturnDialog(order, orderProvider),
+                      icon: const Icon(Icons.assignment_return_outlined, size: 15),
+                      label: const Text('Duyệt Đổi / Trả'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      ),
+                    ),
+                  ] else ...[
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => OrderDetailScreen(initialOrder: order),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.arrow_forward, size: 14),
+                      label: const Text('Chi tiết đơn →'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Thumbnail và tóm tắt từng sản phẩm trong đơn hàng
+  Widget _buildOrderItemPreview(CartItemModel item) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: Container(
+            width: 44,
+            height: 44,
+            color: Colors.grey.shade200,
+            child: item.imageUrl.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: item.imageUrl,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => const Icon(
+                      Icons.image_not_supported_outlined,
+                      size: 20,
+                      color: Colors.grey,
+                    ),
+                  )
+                : const Icon(Icons.shopping_bag_outlined, size: 20, color: Colors.grey),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.productName,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Size: ${item.size}${item.color.isNotEmpty ? ' | Màu: ${item.color}' : ''}',
+                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              'x${item.quantity}',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+            ),
+            Text(
+              AppFormatters.formatVND(item.itemTotal),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Huy hiệu trạng thái thanh toán
+  Widget _buildPaymentStatusBadge(String paymentStatus) {
+    Color bg;
+    Color fg;
+    String text;
+    switch (paymentStatus) {
+      case OrderModel.paymentPaid:
+        bg = Colors.green.shade50;
+        fg = Colors.green.shade700;
+        text = 'Đã TT';
+        break;
+      case OrderModel.paymentSubmitted:
+        bg = Colors.amber.shade50;
+        fg = Colors.amber.shade800;
+        text = 'Chờ đối soát';
+        break;
+      case OrderModel.paymentRefunded:
+        bg = Colors.purple.shade50;
+        fg = Colors.purple.shade700;
+        text = 'Đã hoàn tiền';
+        break;
+      default:
+        bg = Colors.grey.shade100;
+        fg = Colors.grey.shade700;
+        text = 'Chưa TT';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(color: fg.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg),
+      ),
+    );
+  }
+
+  /// Duyệt giao hàng với kiểm tra cảnh báo VietQR chưa thanh toán
+  Future<void> _handleAdminApproveDelivery(
+    OrderModel order,
+    OrderProvider orderProvider,
+  ) async {
+    if (order.isVietQr && !order.isPaid) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Cảnh báo VietQR', style: TextStyle(fontSize: 16)),
+            ],
+          ),
+          content: Text(
+            'Đơn hàng #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId} chọn thanh toán VietQR nhưng chưa được xác nhận thanh toán (Trạng thái: ${order.paymentStatus}).\n\nBạn có chắc chắn muốn duyệt giao hàng ngay không?',
+            style: const TextStyle(fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Quay lại đối soát'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700),
+              child: const Text('Vẫn duyệt giao', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    }
+
+    final success = await orderProvider.updateOrderStatus(
+      orderId: order.orderId,
+      newStatus: OrderModel.statusDelivering,
+      userId: order.userId,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success
+            ? 'Đã duyệt chuyển đơn #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId} sang Đang giao hàng'
+            : 'Lỗi cập nhật: ${orderProvider.errorMessage}'),
+        backgroundColor: success ? Colors.blue.shade700 : Colors.red,
+      ),
+    );
+  }
+
+  /// Admin hủy đơn hàng với Transaction ACID hoàn tồn kho SKU
+  Future<void> _showAdminCancelOrderDialog(
+    OrderModel order,
+    OrderProvider orderProvider,
+  ) async {
+    String selectedReason = 'Hết hàng tồn kho tại chi nhánh';
+    final customReasonController = TextEditingController();
+    final reasons = [
+      'Hết hàng tồn kho tại chi nhánh',
+      'Không thể liên lạc được với khách hàng',
+      'Khách yêu cầu hủy đơn qua hotline',
+      'Sai sót thông tin giá / khuyến mãi',
+      'Lý do khác',
+    ];
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.cancel_outlined, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Hủy đơn hàng (Admin)', style: TextStyle(fontSize: 16)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hủy đơn #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId}. Hành động này sẽ tự động hoàn trả toàn bộ tồn kho SKU và chuyển trạng thái thanh toán sang Hoàn tiền (nếu đã thanh toán).',
+                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                const Text('Chọn lý do hủy:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                ...reasons.map((r) => InkWell(
+                      onTap: () => setDialogState(() => selectedReason = r),
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              selectedReason == r
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                              size: 18,
+                              color: selectedReason == r ? AppColors.primary : Colors.grey,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(r, style: const TextStyle(fontSize: 13)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )),
+                if (selectedReason == 'Lý do khác') ...[
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: customReasonController,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      hintText: 'Nhập lý do hủy chi tiết...',
+                      hintStyle: TextStyle(fontSize: 12),
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.all(8),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Đóng'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Xác nhận hủy đơn', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final finalReason = selectedReason == 'Lý do khác' &&
+            customReasonController.text.trim().isNotEmpty
+        ? customReasonController.text.trim()
+        : selectedReason;
+    customReasonController.dispose();
+
+    if (confirmed == true) {
+      final success = await orderProvider.cancelOrder(
+        order.orderId,
+        cancelReason: finalReason,
+        cancelledBy: 'admin',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success
+              ? 'Đã hủy đơn hàng và hoàn trả tồn kho SKU thành công'
+              : 'Hủy đơn thất bại: ${orderProvider.errorMessage}'),
+          backgroundColor: success ? AppColors.success : Colors.red,
+        ),
+      );
+    }
+  }
+
+  /// Admin duyệt chấp thuận Đổi / Trả hàng: Hoàn kho SKU và hoàn tiền Refunded
+  Future<void> _showApproveReturnDialog(
+    OrderModel order,
+    OrderProvider orderProvider,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.assignment_return_outlined, color: Colors.purple),
+            SizedBox(width: 8),
+            Text('Duyệt Đổi / Trả hàng', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Text(
+          'Xác nhận duyệt yêu cầu đổi trả cho đơn #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId}?\n\n'
+          '• Lý do khách yêu cầu: "${order.returnReason}"\n'
+          '• Hệ thống sẽ tự động hoàn lại tồn kho cho tất cả SKU trong đơn.\n'
+          '• Trạng thái thanh toán sẽ chuyển sang "Refunded" (Hoàn tiền).',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy bỏ'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple.shade700),
+            child: const Text('Xác nhận duyệt', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
+
+    if (confirmed == true) {
+      final success = await orderProvider.approveReturn(order.orderId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success
+              ? 'Đã duyệt đổi trả và hoàn kho SKU thành công'
+              : 'Duyệt đổi trả thất bại: ${orderProvider.errorMessage}'),
+          backgroundColor: success ? AppColors.success : Colors.red,
+        ),
+      );
+    }
+  }
+
+  /// Admin từ chối yêu cầu Đổi / Trả hàng
+  Future<void> _showRejectReturnDialog(
+    OrderModel order,
+    OrderProvider orderProvider,
+  ) async {
+    final reasonCtrl = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.cancel_outlined, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Từ chối Yêu cầu Đổi / Trả', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Nhập lý do từ chối yêu cầu đổi trả (sản phẩm không còn nguyên tem mác, quá hạn 30 ngày, v.v.):',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                hintText: 'Lý do từ chối...',
+                hintStyle: TextStyle(fontSize: 12),
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.all(8),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Đóng'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
+            child: const Text('Từ chối Đổi/Trả', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    final reason = reasonCtrl.text.trim();
+    reasonCtrl.dispose();
+
+    if (confirmed == true) {
+      final success = await orderProvider.rejectReturn(
+        order.orderId,
+        reason: reason.isNotEmpty ? reason : 'Không đáp ứng điều kiện đổi trả của Lifewear',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success
+              ? 'Đã từ chối yêu cầu đổi trả'
+              : 'Thao tác thất bại: ${orderProvider.errorMessage}'),
+          backgroundColor: success ? Colors.blueGrey : Colors.red,
+        ),
+      );
+    }
+  }
+
+  /// Admin từ chối xác nhận VietQR do chưa nhận được tiền hoặc sai nội dung
+  Future<void> _showRejectPaymentDialog(
+    OrderModel order,
+    OrderProvider orderProvider,
+  ) async {
+    final reasonCtrl = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.money_off, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Từ chối Chuyển khoản VietQR', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Từ chối xác nhận thanh toán cho đơn #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId}. Trạng thái sẽ trả về Unpaid để khách quét lại mã VietQR.',
+              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                hintText: 'Nhập lý do (Chưa nhận được tiền, sai số tiền, sai nội dung...)',
+                hintStyle: TextStyle(fontSize: 12),
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.all(8),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Đóng'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
+            child: const Text('Từ chối giao dịch', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    final reason = reasonCtrl.text.trim();
+    reasonCtrl.dispose();
+
+    if (confirmed == true) {
+      final success = await orderProvider.rejectPaymentSubmitted(
+        order.orderId,
+        reason: reason.isNotEmpty ? reason : 'Chưa nhận được tiền hoặc sai cú pháp chuyển khoản',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success
+              ? 'Đã từ chối giao dịch VietQR'
+              : 'Thao tác thất bại: ${orderProvider.errorMessage}'),
+          backgroundColor: success ? Colors.orange.shade800 : Colors.red,
+        ),
+      );
+    }
   }
 
   // ==========================================
