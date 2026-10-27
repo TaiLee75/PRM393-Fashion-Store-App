@@ -230,45 +230,45 @@ graph TD
 ### 🛍️ GIAI ĐOẠN 3: NÂNG CẤP TRẢI NGHIỆM MUA SẮM KHÁCH HÀNG & CỔNG THANH TOÁN VIETQR
 **Nhánh Git:** `feature/phase-3-customer-flows`
 
-- [ ] **Task 3.1: Chuẩn hóa Điều hướng Cốt lõi & Phiên Người dùng (`lib/main.dart` & `lib/screens/main_nav_screen.dart`)**
-  - [ ] **Khóa Bẫy 11:** Gắn `MainNavScreen(key: ValueKey(auth.userId))`; cung cấp hàm tĩnh `MainNavScreen.switchToTab(context, tabIndex)` sử dụng `Navigator.popUntil((route) => route.isFirst)`.
-  - [ ] Xóa bỏ hoàn toàn các lệnh `pushReplacement` / `pushAndRemoveUntil` sai lệch ở `LoginScreen`, `RegisterScreen`, `ProfileScreen` và `CheckoutScreen`.
-  - [ ] Hiển thị Badge đỏ số tin nhắn chưa đọc trên tab **"Tư vấn"** (Tab 3) và Badge thông báo trên AppBar.
-  - [ ] Khởi tạo lắng nghe `listenUserOrders`, `listenNotifications`, `loadUserCart` ngay khi vào `MainNavScreen`.
+- [x] **Task 3.1: Chuẩn hóa Điều hướng Cốt lõi & Phiên Người dùng (`lib/main.dart` & `lib/screens/main_nav_screen.dart`)**
+  - [x] **Khóa Bẫy 11:** Gắn `MainNavScreen(key: ValueKey(auth.userId))`; cung cấp hàm tĩnh `MainNavScreen.switchToTab(context, tabIndex)` sử dụng `Navigator.popUntil((route) => route.isFirst)`.
+  - [x] Xóa bỏ hoàn toàn các lệnh `pushReplacement` / `pushAndRemoveUntil` sai lệch ở `LoginScreen`, `RegisterScreen`, `ProfileScreen` và `CheckoutScreen`.
+  - [x] Hiển thị Badge đỏ số tin nhắn chưa đọc trên tab **"Tư vấn"** (Tab 3) và Badge thông báo trên AppBar.
+  - [x] Khởi tạo lắng nghe `listenUserOrders`, `listenNotifications`, `loadUserCart` ngay khi vào `MainNavScreen`.
 
-- [ ] **Task 3.2: Nâng cấp Trang chủ & Chi tiết Sản phẩm (`lib/screens/home/`)**
-  - [ ] **Khóa Bẫy 14:** Trong `ProductListScreen` ([lib/screens/home/product_list_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/home/product_list_screen.dart)), phân biệt rõ ràng: chỉ hiện nút Seed Data cho Admin khi `allProducts.isEmpty`; nếu `filteredProducts.isEmpty` thì hiển thị màn hình tìm kiếm rỗng kèm nút *"Xóa bộ lọc & Tìm lại"* (đồng thời gọi `_searchController.clear()`).
-  - [ ] Trên thẻ sản phẩm: Hiển thị badge `-X%`, giá gốc gạch ngang, lượt bán (`Đã bán X`), nút thả tim Wishlist, và lớp phủ **"HẾT HÀNG"** nếu `product.stock == 0`. Gắn sự kiện cho Banner khuyến mãi mở Kho Voucher.
-  - [ ] **Khóa Bẫy 1 & Bẫy 9:** Trong `ProductDetailScreen` ([lib/screens/home/product_detail_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/home/product_detail_screen.dart)):
+- [x] **Task 3.2: Nâng cấp Trang chủ & Chi tiết Sản phẩm (`lib/screens/home/`)**
+  - [x] **Khóa Bẫy 14:** Trong `ProductListScreen` ([lib/screens/home/product_list_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/home/product_list_screen.dart)), phân biệt rõ ràng: chỉ hiện nút Seed Data cho Admin khi `allProducts.isEmpty`; nếu `filteredProducts.isEmpty` thì hiển thị màn hình tìm kiếm rỗng kèm nút *"Xóa bộ lọc & Tìm lại"* (đồng thời gọi `_searchController.clear()`).
+  - [x] Trên thẻ sản phẩm: Hiển thị badge `-X%`, giá gốc gạch ngang, lượt bán (`Đã bán X`), nút thả tim Wishlist, và lớp phủ **"HẾT HÀNG"** nếu `product.stock == 0`. Gắn sự kiện cho Banner khuyến mãi mở Kho Voucher.
+  - [x] **Khóa Bẫy 1 & Bẫy 9:** Trong `ProductDetailScreen` ([lib/screens/home/product_detail_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/home/product_detail_screen.dart)):
     - **Trợ lý Chọn Size (Smart Size Guide Modal):** BottomSheet cho phép kéo thanh trượt Chiều cao (`145-195cm`) và Cân nặng (`40-100kg`) để tự động gợi ý kích cỡ chuẩn nhất (`S/M/L/XL`) kèm nút *"Chọn size này & Lưu số đo"*.
     - **Kẹp số lượng theo tồn kho SKU:** Khi chuyển đổi Size/Màu, tự động kẹp `_quantity = min(_quantity, currentVariantStock)`. Nếu cặp biến thể hết hàng (`== 0`), hiển thị nhãn *"Hết hàng phân loại này"* và làm mờ nút bấm.
     - **Nút "MUA NGAY" độc lập:** Đặt 2 nút song song ở thanh đáy: **"THÊM VÀO GIỎ"** và **"MUA NGAY"** (chuyển thẳng tới `CheckoutScreen(directBuyItems: [item])`).
     - Bổ sung nút Yêu thích (Wishlist) trên AppBar và mục **"Gợi ý phối đồ / Sản phẩm tương tự"** ở cuối trang.
 
-- [ ] **Task 3.3: Nâng cấp Giỏ hàng & Thanh toán Đa kênh (`lib/screens/cart/`)**
-  - [ ] **Khóa Bẫy 2 & Bẫy 9:** Trong `CartScreen` ([lib/screens/cart/cart_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/cart/cart_screen.dart)):
+- [x] **Task 3.3: Nâng cấp Giỏ hàng & Thanh toán Đa kênh (`lib/screens/cart/`)**
+  - [x] **Khóa Bẫy 2 & Bẫy 9:** Trong `CartScreen` ([lib/screens/cart/cart_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/cart/cart_screen.dart)):
     - Checkbox chọn từng món và Checkbox *"Chọn tất cả"*; `subtotal` chỉ tính trên các món được tích chọn.
     - Thanh tiến trình Miễn phí Vận chuyển trực quan (*"Mua thêm X đ để được FREESHIP"*).
     - Đối chiếu trực tiếp với `ProductProvider`: tự động cập nhật giá mới, nếu món nào hết kho hoặc ngừng bán thì làm mờ, bỏ tích chọn và hiện nhãn cảnh báo.
     - Chạm vào phân loại để mở BottomSheet đổi nhanh Size/Màu ngay trong giỏ (tự động gộp số lượng nếu trùng SKU).
-  - [ ] **Khóa Bẫy 1, Bẫy 3 & Bẫy 6:** Trong `CheckoutScreen` ([lib/screens/cart/checkout_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/cart/checkout_screen.dart)):
+  - [x] **Khóa Bẫy 1, Bẫy 3 & Bẫy 6:** Trong `CheckoutScreen` ([lib/screens/cart/checkout_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/cart/checkout_screen.dart)):
     - Nhận diện `checkoutItems = widget.directBuyItems ?? cartProvider.selectedItems`. Tính toán toàn bộ chi phí độc lập dựa trên `checkoutItems`.
     - **Tùy chọn Nhận hàng 2 Tab:** Tab 1 - Giao tận nơi (`DELIVERY`, chọn từ Sổ địa chỉ hoặc Bản đồ, có ô nhập ghi chú giao hàng) vs. Tab 2 - Nhận tại cửa hàng (`PICKUP`, miễn phí ship 100%, chọn từ danh sách Chi nhánh).
     - Kho Voucher: Chặn áp mã `FREESHIP` khi phí ship bằng 0; hiển thị rõ 5 dòng kê khai tài chính minh bạch.
     - Khi đặt đơn thành công: Nếu là Mua ngay thì giữ nguyên giỏ hàng; nếu là Giỏ hàng thì chỉ xóa các món đã chọn (`removePurchasedItems()`). Sử dụng `popUntil` để điều hướng về Tab Đơn hàng.
-  - [ ] **Khóa Bẫy 8 & Động cơ Đối soát VietQR:** Cập nhật `VietQrPaymentDialog` ([lib/screens/cart/widgets/vietqr_dialog.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/cart/widgets/vietqr_dialog.dart)):
+  - [x] **Khóa Bẫy 8 & Động cơ Đối soát VietQR:** Cập nhật `VietQrPaymentDialog` ([lib/screens/cart/widgets/vietqr_dialog.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/cart/widgets/vietqr_dialog.dart)):
     - Nhận tham số `isFromCheckout`.
     - Nút **"Tôi đã chuyển khoản"**: Mở ô nhập mã giao dịch ngân hàng $\rightarrow$ cập nhật `paymentStatus = 'PaymentSubmitted'`.
     - Tích hợp **Stream Live Firestore Listener**: Khi `paymentStatus` chuyển sang `'Paid'` (do Admin duyệt hoặc do Sandbox), Dialog tự động bắn hiệu ứng thành công và đóng lại.
     - Tích hợp **Nút Sandbox Demo Mode** (*"🧪 Giả lập Webhook Ngân hàng"*): Tự động chuyển đơn sang `'Paid'` sau 2s phục vụ chấm điểm đồ án.
 
-- [ ] **Task 3.4: Bản đồ OpenStreetMap & Reverse Geocoding (`lib/screens/map/store_map_screen.dart`)**
-  - [ ] **Khóa Bẫy 19:** Khi ở chế độ chọn địa chỉ (`isPickerMode: true`), tuyệt đối không gán sẵn tên Chi nhánh vào địa chỉ nhà của khách.
-  - [ ] Gọi API **OpenStreetMap Nominatim Reverse Geocoding** với HTTP Header `'User-Agent': 'FashionStoreAppPRM393/1.0'` để tự động phân giải tọa độ ra Số nhà, Tên đường, Phường/Xã, Quận/Huyện thực tế.
-  - [ ] Khóa nút xác nhận trong lúc đang nạp Reverse Geocoding; thêm ô nhập bổ sung *"Số nhà / Tầng / Tòa nhà"* ngay trên thẻ nổi ở đáy bản đồ.
+- [x] **Task 3.4: Bản đồ OpenStreetMap & Reverse Geocoding (`lib/screens/map/store_map_screen.dart`)**
+  - [x] **Khóa Bẫy 19:** Khi ở chế độ chọn địa chỉ (`isPickerMode: true`), tuyệt đối không gán sẵn tên Chi nhánh vào địa chỉ nhà của khách.
+  - [x] Gọi API **OpenStreetMap Nominatim Reverse Geocoding** với HTTP Header `'User-Agent': 'FashionStoreAppPRM393/1.0'` để tự động phân giải tọa độ ra Số nhà, Tên đường, Phường/Xã, Quận/Huyện thực tế.
+  - [x] Khóa nút xác nhận trong lúc đang nạp Reverse Geocoding; thêm ô nhập bổ sung *"Số nhà / Tầng / Tòa nhà"* ngay trên thẻ nổi ở đáy bản đồ.
 
-- [ ] **Task 3.5: Vòng đời Đơn hàng, Hủy/Đổi trả & Mua lại (`lib/screens/orders/`)**
-  - [ ] **Khóa Bẫy 8, Bẫy 16 & Bẫy 20:** Trong `OrderHistoryScreen` ([lib/screens/orders/order_history_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/orders/order_history_screen.dart)) & `OrderDetailScreen` ([lib/screens/orders/order_detail_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/orders/order_detail_screen.dart)):
+- [x] **Task 3.5: Vòng đời Đơn hàng, Hủy/Đổi trả & Mua lại (`lib/screens/orders/`)**
+  - [x] **Khóa Bẫy 8, Bẫy 16 & Bẫy 20:** Trong `OrderHistoryScreen` ([lib/screens/orders/order_history_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/orders/order_history_screen.dart)) & `OrderDetailScreen` ([lib/screens/orders/order_detail_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/orders/order_detail_screen.dart)):
     - Tra cứu live trong cả `userOrders` và `allOrders` để giao diện cập nhật thời gian thực cho cả Khách lẫn Admin.
     - Khóa nút mở mã VietQR: chỉ hiển thị khi `order.paymentMethod == 'VIETQR' && (order.status == 'Pending' || order.status == 'Delivering') && order.paymentStatus == 'Unpaid'`.
     - Hiển thị nhãn trạng thái dòng tiền: *"⏳ Đang chờ Shop đối soát"* (`PaymentSubmitted`), *"✅ Đã thanh toán"* (`Paid`), *"💸 Đã hoàn tiền"* (`Refunded`).
@@ -279,15 +279,15 @@ graph TD
       - Đơn `Cancelled` / `Returned`: Hiển thị lý do hủy/hoàn trả, trạng thái hoàn tiền và nút **"Mua lại đơn này"**.
     - Nút liên hệ cuối trang `OrderDetailScreen`: Khách thì mở Chat kèm thẻ đơn hàng gửi Shop; Admin thì mở `AdminChatDetailScreen` chat với khách đó.
 
-- [ ] **Task 3.6: Tư vấn Trực tuyến, Thông báo, Hồ sơ Cá nhân & Cập nhật Widget Tests Khách hàng**
-  - [ ] Trong `ChatScreen` ([lib/screens/chat/chat_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/chat/chat_screen.dart)): Hỗ trợ hiển thị Thẻ đính kèm Đơn hàng / Sản phẩm; thêm thanh câu hỏi gợi ý nhanh (Quick Replies).
-  - [ ] Trong `NotificationScreen` ([lib/screens/notifications/notification_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/notifications/notification_screen.dart)): Thêm nút *"Đọc tất cả"*; bấm vào thông báo đơn hàng sẽ mở trực tiếp `OrderDetailScreen`.
-  - [ ] Trong `ProfileScreen` & `EditProfileScreen` ([lib/screens/profile/](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/profile/)):
-    - Thêm hộp thoại **"Đổi mật khẩu an toàn"** (nhập Mật khẩu hiện tại, Mật khẩu mới, Xác nhận mật khẩu) với cơ chế Re-authentication.
-    - Quản lý **Sổ địa chỉ nhận hàng (`savedAddresses`)** và **Số đo cơ thể**.
-    - Thêm màn hình xem **Danh sách Yêu thích (Wishlist)**.
-    - Thanh tóm tắt trạng thái đơn hàng (Chờ xác nhận, Đang giao, Đã giao, Đổi/Trả).
-  - [ ] Cập nhật ngay các bài Widget Test tầng Customer UI (`test/checkout_screen_test.dart`, `test/order_detail_screen_test.dart`, `test/login_screen_test.dart`, `test/vietqr_dialog_test.dart`) để `flutter test` đạt 100% pass ngay khi kết thúc Giai đoạn 3.
+- [x] **Task 3.6: Tư vấn Trực tuyến, Thông báo, Hồ sơ Cá nhân & Cập nhật Widget Tests Khách hàng**
+  - [x] Trong `ChatScreen` ([lib/screens/chat/chat_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/chat/chat_screen.dart)): Hỗ trợ hiển thị Thẻ đính kèm Đơn hàng / Sản phẩm; thêm thanh câu hỏi gợi ý nhanh (Quick Replies).
+  - [x] Trong `NotificationScreen` ([lib/screens/notifications/notification_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/notifications/notification_screen.dart)): Thêm nút *"Đọc tất cả"*; bấm vào thông báo đơn hàng sẽ mở trực tiếp `OrderDetailScreen`.
+  - [x] Trong `ProfileScreen` & `EditProfileScreen` ([lib/screens/profile/](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/profile/)):
+    - [x] Thêm hộp thoại **"Đổi mật khẩu an toàn"** (nhập Mật khẩu hiện tại, Mật khẩu mới, Xác nhận mật khẩu) với cơ chế Re-authentication.
+    - [x] Quản lý **Sổ địa chỉ nhận hàng (`savedAddresses`)** và **Số đo cơ thể**.
+    - [x] Thêm màn hình xem **Danh sách Yêu thích (Wishlist)**.
+    - [x] Thanh tóm tắt trạng thái đơn hàng (Chờ xác nhận, Đang giao, Đã giao, Đổi/Trả).
+  - [x] Cập nhật ngay các bài Widget Test tầng Customer UI (`test/checkout_screen_test.dart`, `test/order_detail_screen_test.dart`, `test/login_screen_test.dart`, `test/vietqr_dialog_test.dart`) để `flutter test` đạt 100% pass ngay khi kết thúc Giai đoạn 3.
 
 ---
 

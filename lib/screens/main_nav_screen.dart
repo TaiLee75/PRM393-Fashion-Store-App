@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
 import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/order_provider.dart';
 import '../providers/notification_provider.dart';
+import '../providers/chat_provider.dart';
 import 'home/product_list_screen.dart';
 import 'cart/cart_screen.dart';
 import 'orders/order_history_screen.dart';
@@ -14,9 +16,20 @@ import 'notifications/notification_screen.dart';
 import 'admin/shop_admin_screen.dart';
 
 /// Khung điều hướng chính của App (Bottom Navigation Bar phong cách Uniqlo)
+/// Khóa Bẫy 11: Quản trị điều hướng bền vững qua switchToTab & ValueKey(auth.userId)
 class MainNavScreen extends StatefulWidget {
   final int initialIndex;
   const MainNavScreen({super.key, this.initialIndex = 0});
+
+  static _MainNavScreenState? _currentState;
+
+  /// Điều hướng an toàn về tab chỉ định trên MainNavScreen:
+  /// - Pop toàn bộ các route đã push về lại root route (bảo toàn Consumer<AuthProvider> gốc).
+  /// - Chuyển sang tab `tabIndex`.
+  static void switchToTab(BuildContext context, int tabIndex) {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    _currentState?.changeTab(tabIndex);
+  }
 
   @override
   State<MainNavScreen> createState() => _MainNavScreenState();
@@ -36,23 +49,67 @@ class _MainNavScreenState extends State<MainNavScreen> {
   @override
   void initState() {
     super.initState();
+    MainNavScreen._currentState = this;
     _currentIndex = widget.initialIndex;
 
-    // Lắng nghe notification khi có user đăng nhập
+    // Lắng nghe dữ liệu realtime khi có user đăng nhập (an toàn môi trường test)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = context.read<AuthProvider>();
-      if (auth.userId.isNotEmpty) {
-        context.read<NotificationProvider>().listenNotifications(auth.userId);
-        context.read<CartProvider>().loadUserCart(auth.userId);
+      if (!mounted) return;
+      final auth = Provider.of<AuthProvider?>(context, listen: false);
+      if (auth != null && auth.userId.isNotEmpty) {
+        Provider.of<NotificationProvider?>(context, listen: false)
+            ?.listenNotifications(auth.userId);
+        Provider.of<CartProvider?>(context, listen: false)
+            ?.loadUserCart(auth.userId);
+        Provider.of<OrderProvider?>(context, listen: false)
+            ?.listenUserOrders(auth.userId);
+        Provider.of<ChatProvider?>(context, listen: false)
+            ?.listenMessages(auth.userId);
       }
     });
   }
 
   @override
+  void dispose() {
+    if (MainNavScreen._currentState == this) {
+      MainNavScreen._currentState = null;
+    }
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(MainNavScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialIndex != widget.initialIndex) {
+      changeTab(widget.initialIndex);
+    }
+  }
+
+  void changeTab(int index) {
+    if (index < 0 || index >= _screens.length) return;
+    if (mounted) {
+      setState(() => _currentIndex = index);
+      if (index == 3) {
+        final auth = Provider.of<AuthProvider?>(context, listen: false);
+        if (auth != null && auth.userId.isNotEmpty) {
+          Provider.of<ChatProvider?>(context, listen: false)
+              ?.markChatAsReadByCustomer(auth.userId);
+        }
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final cartProvider = context.watch<CartProvider>();
-    final notiProvider = context.watch<NotificationProvider>();
-    final authProvider = context.watch<AuthProvider>();
+    final cartProvider = context.watch<CartProvider?>();
+    final notiProvider = context.watch<NotificationProvider?>();
+    final authProvider = context.watch<AuthProvider?>();
+    final chatProvider = context.watch<ChatProvider?>();
+
+    final totalCartQuantity = cartProvider?.totalQuantity ?? 0;
+    final unreadNotiCount = notiProvider?.unreadCount ?? 0;
+    final unreadChatCount = chatProvider?.unreadCustomerCount ?? 0;
+    final isAdmin = authProvider?.isAdmin ?? false;
 
     return Scaffold(
       backgroundColor: AppColors.white,
@@ -118,7 +175,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
                   );
                 },
               ),
-              if (notiProvider.unreadCount > 0)
+              if (unreadNotiCount > 0)
                 Positioned(
                   top: 8,
                   right: 8,
@@ -130,7 +187,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
                     ),
                     constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                     child: Text(
-                      '${notiProvider.unreadCount}',
+                      '$unreadNotiCount',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: Colors.white,
@@ -147,13 +204,13 @@ class _MainNavScreenState extends State<MainNavScreen> {
           IconButton(
             icon: Icon(
               Icons.admin_panel_settings,
-              color: authProvider.isAdmin ? AppColors.primary : AppColors.grey,
+              color: isAdmin ? AppColors.primary : AppColors.grey,
             ),
-            tooltip: authProvider.isAdmin
+            tooltip: isAdmin
                 ? 'Shop Admin Tool (Dành cho Admin)'
                 : 'Chế độ Khách hàng (Vào Tài khoản để bật Admin)',
             onPressed: () {
-              if (!authProvider.isAdmin) {
+              if (!isAdmin) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text(
@@ -180,7 +237,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: (index) => changeTab(index),
         type: BottomNavigationBarType.fixed,
         backgroundColor: AppColors.white,
         selectedItemColor: AppColors.primary,
@@ -197,18 +254,18 @@ class _MainNavScreenState extends State<MainNavScreen> {
           ),
           BottomNavigationBarItem(
             icon: Badge(
-              isLabelVisible: cartProvider.totalQuantity > 0,
+              isLabelVisible: totalCartQuantity > 0,
               label: Text(
-                '${cartProvider.totalQuantity}',
+                '$totalCartQuantity',
                 style: const TextStyle(color: Colors.white, fontSize: 10),
               ),
               backgroundColor: AppColors.primary,
               child: const Icon(Icons.shopping_bag_outlined),
             ),
             activeIcon: Badge(
-              isLabelVisible: cartProvider.totalQuantity > 0,
+              isLabelVisible: totalCartQuantity > 0,
               label: Text(
-                '${cartProvider.totalQuantity}',
+                '$totalCartQuantity',
                 style: const TextStyle(color: Colors.white, fontSize: 10),
               ),
               backgroundColor: AppColors.primary,
@@ -221,9 +278,25 @@ class _MainNavScreenState extends State<MainNavScreen> {
             activeIcon: Icon(Icons.receipt_long),
             label: 'Đơn hàng',
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            activeIcon: Icon(Icons.chat_bubble),
+          BottomNavigationBarItem(
+            icon: Badge(
+              isLabelVisible: unreadChatCount > 0,
+              label: Text(
+                '$unreadChatCount',
+                style: const TextStyle(color: Colors.white, fontSize: 10),
+              ),
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.chat_bubble_outline),
+            ),
+            activeIcon: Badge(
+              isLabelVisible: unreadChatCount > 0,
+              label: Text(
+                '$unreadChatCount',
+                style: const TextStyle(color: Colors.white, fontSize: 10),
+              ),
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.chat_bubble),
+            ),
             label: 'Tư vấn',
           ),
           const BottomNavigationBarItem(

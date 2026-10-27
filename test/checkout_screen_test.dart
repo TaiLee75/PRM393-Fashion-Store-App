@@ -32,11 +32,12 @@ void main() {
     // Kiểm tra có tiêu đề Thanh toán
     expect(find.text('THANH TOÁN ĐƠN HÀNG'), findsOneWidget);
 
-    // Kiểm tra các trường nhập thông tin giao hàng
-    expect(find.byType(TextFormField), findsNWidgets(3));
+    // Kiểm tra các trường nhập thông tin giao hàng (Họ tên, SĐT, Địa chỉ, Ghi chú)
+    expect(find.byType(TextFormField), findsNWidgets(4));
     expect(find.textContaining('Họ tên người nhận'), findsOneWidget);
     expect(find.textContaining('Số điện thoại liên hệ'), findsOneWidget);
     expect(find.textContaining('Địa chỉ nhận hàng chi tiết'), findsOneWidget);
+    expect(find.textContaining('Ghi chú cho đơn hàng'), findsOneWidget);
 
     // Kiểm tra checkbox lưu địa chỉ mặc định
     expect(find.byType(CheckboxListTile), findsOneWidget);

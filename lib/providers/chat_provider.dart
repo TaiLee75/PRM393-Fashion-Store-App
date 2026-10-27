@@ -21,8 +21,11 @@ class ChatProvider extends ChangeNotifier {
   bool _isAdminLoading = false;
 
   StreamSubscription<List<MessageModel>>? _customerMessagesSub;
+  StreamSubscription<Map<String, dynamic>?>? _customerRoomSub;
   StreamSubscription<List<MessageModel>>? _adminMessagesSub;
   StreamSubscription<List<Map<String, dynamic>>>? _adminChatsSub;
+
+  int _unreadCustomerCount = 0;
 
   ChatProvider({FirestoreService? firestoreService})
       : _firestoreService = firestoreService ?? FirestoreService();
@@ -45,6 +48,12 @@ class ChatProvider extends ChangeNotifier {
   bool get isAdminLoading => _isAdminLoading;
   String? get currentCustomerId => _currentCustomerId;
   String? get adminActiveCustomerId => _adminActiveCustomerId;
+
+  /// Tổng số tin nhắn chưa đọc của khách hàng hiện tại (hiển thị Badge đỏ trên Tab 3)
+  int get unreadCustomerCount => _unreadCustomerCount;
+
+  /// Tương thích ngược: unreadCount trả về số tin chưa đọc của khách
+  int get unreadCount => _unreadCustomerCount;
 
   /// Tổng số tin nhắn chưa đọc của tất cả các phòng chat (hiển thị Badge đỏ trên Tab Admin)
   int get unreadAdminTotal {
@@ -73,6 +82,11 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setMockUnreadCustomerCount(int count) {
+    _unreadCustomerCount = count;
+    notifyListeners();
+  }
+
   // ==========================================
   // 2. LẮNG NGHE TIN NHẮN KHÁCH HÀNG (CUSTOMER STREAM - TAB 3)
   // ==========================================
@@ -86,6 +100,7 @@ class ChatProvider extends ChangeNotifier {
     }
 
     _customerMessagesSub?.cancel();
+    _customerRoomSub?.cancel();
     _currentCustomerId = customerId;
     _isLoading = true;
     notifyListeners();
@@ -100,6 +115,15 @@ class ChatProvider extends ChangeNotifier {
         _isLoading = false;
         notifyListeners();
       });
+
+      _customerRoomSub =
+          _firestoreService.streamChatRoom(customerId).listen((roomData) {
+        if (roomData != null) {
+          _unreadCustomerCount =
+              (roomData['unreadByCustomer'] as num?)?.toInt() ?? 0;
+          notifyListeners();
+        }
+      }, onError: (_) {});
     } catch (_) {
       _isLoading = false;
       notifyListeners();
@@ -230,8 +254,10 @@ class ChatProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Đánh dấu Khách hàng đã đọc tin nhắn của Admin
+  /// Đánh dấu Khách hàng đã đọc tin nhắn của Admin (kèm Optimistic UI)
   Future<void> markChatAsReadByCustomer(String customerId) async {
+    _unreadCustomerCount = 0;
+    notifyListeners();
     try {
       await _firestoreService.markChatAsReadByCustomer(customerId);
     } catch (_) {}
@@ -245,6 +271,8 @@ class ChatProvider extends ChangeNotifier {
   void resetSession() {
     _customerMessagesSub?.cancel();
     _customerMessagesSub = null;
+    _customerRoomSub?.cancel();
+    _customerRoomSub = null;
     _adminMessagesSub?.cancel();
     _adminMessagesSub = null;
     _adminChatsSub?.cancel();
@@ -253,6 +281,7 @@ class ChatProvider extends ChangeNotifier {
     _customerMessages = [];
     _adminMessages = [];
     _adminChatRooms = [];
+    _unreadCustomerCount = 0;
     _currentCustomerId = null;
     _adminActiveCustomerId = null;
     _isLoading = false;
@@ -263,6 +292,7 @@ class ChatProvider extends ChangeNotifier {
   @override
   void dispose() {
     _customerMessagesSub?.cancel();
+    _customerRoomSub?.cancel();
     _adminMessagesSub?.cancel();
     _adminChatsSub?.cancel();
     super.dispose();
