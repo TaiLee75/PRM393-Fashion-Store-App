@@ -48,7 +48,7 @@ class _AdminBranchManagementScreenState
                 top: 20,
                 left: 20,
                 right: 20,
-                bottom: MediaQuery.of(dialogCtx).viewInsets.bottom + 24,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
               ),
               decoration: const BoxDecoration(
                 color: Colors.white,
@@ -384,7 +384,7 @@ class _AdminBranchManagementScreenState
                 top: 20,
                 left: 20,
                 right: 20,
-                bottom: MediaQuery.of(dialogCtx).viewInsets.bottom + 24,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
               ),
               decoration: const BoxDecoration(
                 color: Colors.white,

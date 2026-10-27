@@ -313,7 +313,7 @@ class _AdminProductListScreenState extends State<AdminProductListScreen> {
                 top: 20,
                 left: 20,
                 right: 20,
-                bottom: MediaQuery.of(dialogCtx).viewInsets.bottom + 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
               ),
               decoration: const BoxDecoration(
                 color: Colors.white,
