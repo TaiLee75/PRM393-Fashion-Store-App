@@ -310,19 +310,19 @@ graph TD
     - Đơn `Delivering`: Nút **"Xác nhận đã giao thành công"** (`Delivered` + tự động cập nhật `paymentStatus = 'Paid'`).
     - Đơn `ReturnRequested`: Nút **"Duyệt Đổi / Trả hàng"** (`status = 'Returned'`, tự động hoàn kho SKU và chuyển `paymentStatus = 'Refunded'`) hoặc **"Từ chối Đổi / Trả"**.
 
-- [ ] **Task 4.3: Nâng cấp Quản lý Kho, Danh mục & Chi nhánh**
-  - [ ] Trong `AdminProductListScreen` ([lib/screens/admin/admin_product_list_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_product_list_screen.dart)):
+- [x] **Task 4.3: Nâng cấp Quản lý Kho, Danh mục & Chi nhánh**
+  - [x] Trong `AdminProductListScreen` ([lib/screens/admin/admin_product_list_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_product_list_screen.dart)):
     - Hiển thị rõ `Tồn kho: X | Đã bán: Y` và trạng thái `Đang bán / Ngừng bán` trên từng thẻ sản phẩm.
     - Thêm nút **"Nhập kho nhanh (+Stock)"** (hỗ trợ nhập thêm số lượng cho từng biến thể SKU) và dialog **"Quản lý Danh mục (`categories`)"** hỗ trợ Admin Thêm / Sửa / Xóa danh mục Firestore.
-  - [ ] **Khóa Bẫy 12 & Bẫy 17:** Trong `AdminProductFormScreen` ([lib/screens/admin/admin_product_form_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_product_form_screen.dart)):
+  - [x] **Khóa Bẫy 12 & Bẫy 17:** Trong `AdminProductFormScreen` ([lib/screens/admin/admin_product_form_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_product_form_screen.dart)):
     - Danh mục nạp động 100% từ `productProvider.categories`; kiểm tra an toàn `effectiveCategoryId` để triệt tiêu lỗi `DropdownButtonFormField AssertionError`.
     - Hỗ trợ đầy đủ kích cỡ `'FreeSize'`, đồng bộ bảng màu và cho phép thêm Màu/Size tùy chỉnh.
     - Quản lý danh sách nhiều ảnh (`imageUrls`), nhập Giá gốc (`originalPrice`), Tồn kho theo từng biến thể SKU (`variantStock`) và chuyển đổi trạng thái `isActive`.
     - Lưu chỉnh sửa bằng cách giữ nguyên `reviews`, `rating`, `soldCount` mới nhất trên Firestore.
-  - [ ] **Khóa Bẫy 19:** Trong `AdminBranchManagementScreen` ([lib/screens/admin/admin_branch_management_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_branch_management_screen.dart)):
+  - [x] **Khóa Bẫy 19:** Trong `AdminBranchManagementScreen` ([lib/screens/admin/admin_branch_management_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_branch_management_screen.dart)):
     - Bổ sung chức năng **Chỉnh sửa chi nhánh (`updateBranch`)**.
     - Bổ sung nút **"Ghim vị trí trên Bản đồ"** để tự động điền Tọa độ và Địa chỉ.
-  - [ ] Trong `AdminChatInboxScreen` ([lib/screens/admin/admin_chat_inbox_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_chat_inbox_screen.dart)):
+  - [x] Trong `AdminChatInboxScreen` ([lib/screens/admin/admin_chat_inbox_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_chat_inbox_screen.dart)):
     - Hiển thị Badge đỏ số tin nhắn chưa đọc của từng khách; kết nối kênh stream Admin riêng biệt không làm ảnh hưởng Tab 3.
 
 - [ ] **Task 4.4: Hiện đại hóa Toàn bộ Bộ Kiểm thử Tự động (`test/`)**

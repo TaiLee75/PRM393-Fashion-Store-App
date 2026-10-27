@@ -445,6 +445,15 @@ class ProductProvider extends ChangeNotifier {
         if (skuKey != null && skuKey.isNotEmpty) {
           final old = updatedVariantStock[skuKey] ?? 0;
           updatedVariantStock[skuKey] = old + additionalStock;
+        } else if (updatedVariantStock.isNotEmpty) {
+          final perSku = (additionalStock / updatedVariantStock.length).floor();
+          final remainder = additionalStock % updatedVariantStock.length;
+          int count = 0;
+          for (final k in updatedVariantStock.keys.toList()) {
+            updatedVariantStock[k] =
+                (updatedVariantStock[k] ?? 0) + perSku + (count < remainder ? 1 : 0);
+            count++;
+          }
         }
         _products[index] = current.copyWith(
           stock: current.stock + additionalStock,
