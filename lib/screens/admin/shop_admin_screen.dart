@@ -1,8 +1,11 @@
+import 'dart:math';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/order_model.dart';
+import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/product_provider.dart';
@@ -26,6 +29,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
   String _adminOrderFilter = 'ALL';
   final TextEditingController _adminOrderSearchController = TextEditingController();
   String _adminOrderQuery = '';
+  String _selectedTimeRange = 'ALL_TIME'; // 'TODAY', 'LAST_7_DAYS', 'LAST_30_DAYS', 'ALL_TIME'
 
   @override
   void initState() {
@@ -133,120 +137,169 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
   }
 
   // ==========================================
-  // TAB 1: DASHBOARD & QUICK ACCESS MENUS
+  // TAB 1: DASHBOARD BI & QUICK ACCESS MENUS
   // ==========================================
+  List<OrderModel> _filterOrdersByTime(List<OrderModel> orders) {
+    if (_selectedTimeRange == 'ALL_TIME') return orders;
+
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    // Tính toán theo ngày trọn vẹn (inclusive calendar days)
+    final sevenDaysStart = todayStart.subtract(const Duration(days: 6));
+    final thirtyDaysStart = todayStart.subtract(const Duration(days: 29));
+
+    return orders.where((order) {
+      final date = order.createdAt;
+      switch (_selectedTimeRange) {
+        case 'TODAY':
+          return !date.isBefore(todayStart);
+        case 'LAST_7_DAYS':
+          return !date.isBefore(sevenDaysStart);
+        case 'LAST_30_DAYS':
+          return !date.isBefore(thirtyDaysStart);
+        default:
+          return true;
+      }
+    }).toList();
+  }
+
+  List<ProductModel> _getLowStockProducts(List<ProductModel> products) {
+    final list = products.where((p) {
+      if (p.stock <= 5) return true;
+      if (p.variantStock.isNotEmpty) {
+        return p.variantStock.values.any((q) => q <= 0);
+      }
+      return false;
+    }).toList();
+
+    // Sắp xếp ưu tiên mặt hàng hết sạch hàng (stock == 0) lên đầu
+    list.sort((a, b) => a.stock.compareTo(b.stock));
+    return list;
+  }
+
+  List<String> _getOutOfStockVariants(ProductModel p) {
+    if (p.variantStock.isEmpty) return [];
+    return p.variantStock.entries
+        .where((e) => e.value <= 0)
+        .map((e) => e.key.replaceAll('_', ' - '))
+        .toList();
+  }
+
+  List<ProductModel> _getTopSellingProducts(List<ProductModel> products) {
+    // Chỉ xếp hạng các sản phẩm đã phát sinh doanh số bán hàng (soldCount > 0)
+    final list = products.where((p) => p.soldCount > 0).toList();
+    list.sort((a, b) => b.soldCount.compareTo(a.soldCount));
+    return list.take(5).toList();
+  }
+
+  String _getCategoryName(String categoryId, ProductProvider productProvider) {
+    if (categoryId.isEmpty) return 'Thời trang';
+    final match =
+        productProvider.categories.where((c) => c.id == categoryId).firstOrNull;
+    return match?.name ?? 'Thời trang';
+  }
+
   Widget _buildDashboardTab(
     ProductProvider productProvider,
     OrderProvider orderProvider,
   ) {
     final products = productProvider.allProducts;
-    final orders = orderProvider.allOrders;
+    final allOrders = orderProvider.allOrders;
 
-    final pendingCount = orders.where((o) => o.status == 'Pending').length;
-    final deliveringCount =
-        orders.where((o) => o.status == 'Delivering').length;
-    final deliveredOrders = orders.where((o) => o.status == 'Delivered');
+    // Lọc đơn hàng theo mốc thời gian đã chọn
+    final timeFilteredOrders = _filterOrdersByTime(allOrders);
 
-    num totalRevenue = 0;
-    for (var o in deliveredOrders) {
-      totalRevenue += o.totalPrice;
+    // Tính toán chỉ số BI theo Khóa Bẫy 5
+    final deliveredOrders = timeFilteredOrders
+        .where((o) => o.status == OrderModel.statusDelivered)
+        .toList();
+
+    num netRevenue = 0;
+    for (final o in deliveredOrders) {
+      netRevenue += o.totalPrice;
     }
+    final num aov = deliveredOrders.isNotEmpty
+        ? (netRevenue / deliveredOrders.length)
+        : 0;
+
+    final pendingCount = timeFilteredOrders
+        .where((o) => o.status == OrderModel.statusPending)
+        .length;
+    final deliveringCount = timeFilteredOrders
+        .where((o) => o.status == OrderModel.statusDelivering)
+        .length;
+    final deliveredCount = deliveredOrders.length;
+    final returnCount = timeFilteredOrders
+        .where((o) =>
+            o.status == OrderModel.statusReturnRequested ||
+            o.status == OrderModel.statusReturned)
+        .length;
+    final cancelledCount = timeFilteredOrders
+        .where((o) => o.status == OrderModel.statusCancelled)
+        .length;
+
+    // Danh sách sản phẩm tồn kho thấp hoặc hết hàng
+    final lowStockProducts = _getLowStockProducts(products);
+
+    // Danh sách Top 5 sản phẩm bán chạy nhất
+    final top5Products = _getTopSellingProducts(products);
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        // 1. THỐNG KÊ NHANH (KPI METRICS)
+        // 1. THANH LỌC THỜI GIAN BI
+        _buildTimeFilterBar(),
+
+        const SizedBox(height: 14),
+
+        // 2. KHÓA BẪY 5: THẺ DOANH THU THỰC THU & GIÁ TRỊ ĐƠN TRUNG BÌNH (AOV)
+        _buildNetRevenueCard(
+          netRevenue: netRevenue,
+          aov: aov,
+          deliveredCount: deliveredCount,
+        ),
+
+        const SizedBox(height: 16),
+
+        // 3. CÁC THẺ CHỈ SỐ KPI VẬN HÀNH (KPI METRICS)
         const Text(
-          'CHỈ SỐ HOẠT ĐỘNG KINH DOANH',
+          'CHỈ SỐ VẬN HÀNH & TRẠNG THÁI ĐƠN HÀNG',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
+            letterSpacing: 1.1,
             color: AppColors.textSecondary,
           ),
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildMetricCard(
-                'Kho Sản Phẩm',
-                '${products.length}',
-                'mặt hàng (chạm để xem)',
-                Icons.inventory_2,
-                Colors.blue.shade700,
-                Colors.blue.shade50,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AdminProductListScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildMetricCard(
-                'Chờ Duyệt Đơn',
-                '$pendingCount',
-                'đơn cần xử lý (lọc ngay)',
-                Icons.hourglass_top_rounded,
-                Colors.orange.shade800,
-                Colors.orange.shade50,
-                onTap: () {
-                  _tabController.animateTo(1);
-                  setState(() => _adminOrderFilter = 'Pending');
-                },
-              ),
-            ),
-          ],
+        const SizedBox(height: 10),
+        _buildKpiMetricsGrid(
+          totalProducts: products.length,
+          pendingCount: pendingCount,
+          deliveringCount: deliveringCount,
+          deliveredCount: deliveredCount,
+          returnCount: returnCount,
+          cancelledCount: cancelledCount,
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildMetricCard(
-                'Đang Giao Hàng',
-                '$deliveringCount',
-                'đơn trên đường (lọc ngay)',
-                Icons.local_shipping,
-                Colors.purple.shade700,
-                Colors.purple.shade50,
-                onTap: () {
-                  _tabController.animateTo(1);
-                  setState(() => _adminOrderFilter = 'Delivering');
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildMetricCard(
-                'Doanh Thu Thực',
-                AppFormatters.formatVND(totalRevenue),
-                'đã giao xong (lọc ngay)',
-                Icons.monetization_on,
-                Colors.green.shade800,
-                Colors.green.shade50,
-                onTap: () {
-                  _tabController.animateTo(1);
-                  setState(() => _adminOrderFilter = 'Delivered');
-                },
-              ),
-            ),
-          ],
-        ),
+
+        const SizedBox(height: 20),
+
+        // 4. WIDGET CẢNH BÁO TỒN KHO THẤP / HẾT HÀNG
+        _buildLowStockWarningWidget(lowStockProducts, products.length),
+
+        const SizedBox(height: 20),
+
+        // 5. BẢNG XẾP HẠNG TOP 5 SẢN PHẨM BÁN CHẠY NHẤT (BEST SELLERS)
+        _buildBestSellersRankingWidget(top5Products, productProvider),
 
         const SizedBox(height: 24),
 
-        // 2. PHÂN HỆ QUẢN TRỊ TRỰC TIẾP
+        // 6. PHÂN HỆ QUẢN TRỊ TRỰC TIẾP
         const Text(
           'PHÂN HỆ QUẢN TRỊ CỬA HÀNG',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
+            letterSpacing: 1.1,
             color: AppColors.textSecondary,
           ),
         ),
@@ -256,7 +309,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
         _buildNavigationCard(
           title: 'Quản Lý Kho Hàng & Sản Phẩm',
           subtitle:
-              'Thêm mới, chỉnh sửa thông tin, bảng size, màu sắc & xóa sản phẩm khỏi Firestore',
+              'Thêm mới, sửa thông tin, bảng size, màu sắc, tồn kho SKU & danh mục Firestore',
           icon: Icons.app_registration,
           iconColor: AppColors.primary,
           onTap: () {
@@ -273,7 +326,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
         _buildNavigationCard(
           title: 'Duyệt Đơn Hàng & Vận Chuyển',
           subtitle:
-              'Xử lý trạng thái Pending -> Delivering -> Delivered và kích hoạt Real-time Notifications',
+              'Xử lý trạng thái Pending -> Delivering -> Delivered, đối soát VietQR & Đổi/Trả hàng',
           icon: Icons.receipt_long,
           iconColor: Colors.blue.shade800,
           onTap: () {
@@ -287,7 +340,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
         _buildNavigationCard(
           title: 'Quản Lý Hệ Thống Chi Nhánh',
           subtitle:
-              'Thêm chi nhánh mới, cập nhật hotline, địa chỉ và tọa độ OpenStreetMap',
+              'Thêm chi nhánh mới, cập nhật hotline, địa chỉ và ghim tọa độ OpenStreetMap',
           icon: Icons.store_mall_directory,
           iconColor: Colors.teal.shade800,
           onTap: () {
@@ -317,8 +370,868 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
           },
         ),
 
-        const SizedBox(height: 32),
+        const SizedBox(height: 24),
       ],
+    );
+  }
+
+  Widget _buildTimeFilterBar() {
+    final ranges = [
+      {'key': 'TODAY', 'label': 'Hôm nay', 'icon': Icons.today_rounded},
+      {'key': 'LAST_7_DAYS', 'label': '7 ngày qua', 'icon': Icons.date_range_rounded},
+      {'key': 'LAST_30_DAYS', 'label': '30 ngày qua', 'icon': Icons.calendar_month_rounded},
+      {'key': 'ALL_TIME', 'label': 'Toàn thời gian', 'icon': Icons.all_inclusive_rounded},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.filter_alt_outlined, size: 16, color: AppColors.textSecondary),
+              const SizedBox(width: 6),
+              const Text(
+                'KỲ THỐNG KÊ DOANH THU & KPI:',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.8,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                _selectedTimeRange == 'TODAY'
+                    ? 'Hôm nay'
+                    : _selectedTimeRange == 'LAST_7_DAYS'
+                        ? '7 ngày qua'
+                        : _selectedTimeRange == 'LAST_30_DAYS'
+                            ? '30 ngày qua'
+                            : 'Tất cả đơn',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: ranges.map((r) {
+                final isSelected = _selectedTimeRange == r['key'];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: InkWell(
+                    onTap: () {
+                      setState(() => _selectedTimeRange = r['key'] as String);
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.black : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected ? AppColors.black : Colors.grey.shade300,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            r['icon'] as IconData,
+                            size: 13,
+                            color: isSelected ? Colors.white : AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            r['label'] as String,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              color: isSelected ? Colors.white : AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNetRevenueCard({
+    required num netRevenue,
+    required num aov,
+    required int deliveredCount,
+  }) {
+    return InkWell(
+      onTap: () {
+        _tabController.animateTo(1);
+        setState(() => _adminOrderFilter = OrderModel.statusDelivered);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.insights_rounded,
+                        color: Color(0xFF10B981),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'DOANH THU THỰC THU (NET REVENUE)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: const Text(
+                    'STATUS: DELIVERED',
+                    style: TextStyle(
+                      color: Color(0xFF34D399),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              AppFormatters.formatCurrency(netRevenue),
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 1,
+              color: Colors.white.withValues(alpha: 0.12),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_outline, size: 15, color: Color(0xFF34D399)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Đơn hoàn tất: $deliveredCount đơn',
+                        style: const TextStyle(fontSize: 12, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.pie_chart_outline, size: 15, color: Color(0xFF60A5FA)),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'AOV: ${AppFormatters.formatCurrency(aov)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, color: Colors.white70),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Row(
+              children: [
+                Icon(Icons.shield_outlined, size: 13, color: Colors.white54),
+                SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'Khóa Bẫy 5: Không tính đơn Hủy hoặc Hoàn trả • Chạm để xem danh sách',
+                    style: TextStyle(fontSize: 10.5, color: Colors.white54),
+                  ),
+                ),
+                Icon(Icons.arrow_forward_ios, size: 11, color: Colors.white54),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKpiMetricsGrid({
+    required int totalProducts,
+    required int pendingCount,
+    required int deliveringCount,
+    required int deliveredCount,
+    required int returnCount,
+    required int cancelledCount,
+  }) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                'Kho Sản Phẩm',
+                '$totalProducts',
+                'mặt hàng đang có (chạm xem)',
+                Icons.inventory_2,
+                Colors.blue.shade700,
+                Colors.blue.shade50,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AdminProductListScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                'Chờ Duyệt Đơn',
+                '$pendingCount',
+                'đơn cần xử lý (lọc ngay)',
+                Icons.hourglass_top_rounded,
+                Colors.orange.shade800,
+                Colors.orange.shade50,
+                onTap: () {
+                  _tabController.animateTo(1);
+                  setState(() => _adminOrderFilter = OrderModel.statusPending);
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                'Đang Giao Hàng',
+                '$deliveringCount',
+                'đơn trên đường (lọc ngay)',
+                Icons.local_shipping_outlined,
+                Colors.indigo.shade700,
+                Colors.indigo.shade50,
+                onTap: () {
+                  _tabController.animateTo(1);
+                  setState(() => _adminOrderFilter = OrderModel.statusDelivering);
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                'Giao Hoàn Tất',
+                '$deliveredCount',
+                'giao thành công (lọc ngay)',
+                Icons.verified,
+                Colors.green.shade800,
+                Colors.green.shade50,
+                onTap: () {
+                  _tabController.animateTo(1);
+                  setState(() => _adminOrderFilter = OrderModel.statusDelivered);
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                'Yêu Cầu Đổi / Trả',
+                '$returnCount',
+                'cần xét duyệt (lọc ngay)',
+                Icons.assignment_return_rounded,
+                Colors.purple.shade700,
+                Colors.purple.shade50,
+                onTap: () {
+                  _tabController.animateTo(1);
+                  setState(() => _adminOrderFilter = OrderModel.statusReturnRequested);
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                'Đơn Đã Hủy',
+                '$cancelledCount',
+                'đơn bị hủy (lọc ngay)',
+                Icons.cancel_outlined,
+                Colors.red.shade700,
+                Colors.red.shade50,
+                onTap: () {
+                  _tabController.animateTo(1);
+                  setState(() => _adminOrderFilter = OrderModel.statusCancelled);
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLowStockWarningWidget(
+    List<ProductModel> lowStockProducts,
+    int totalProducts,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: lowStockProducts.isNotEmpty
+              ? Colors.orange.shade300
+              : Colors.green.shade200,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: lowStockProducts.isNotEmpty
+                  ? Colors.orange.shade50
+                  : Colors.green.shade50,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(9)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  lowStockProducts.isNotEmpty
+                      ? Icons.warning_amber_rounded
+                      : Icons.check_circle_rounded,
+                  color: lowStockProducts.isNotEmpty
+                      ? Colors.orange.shade900
+                      : Colors.green.shade800,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'CẢNH BÁO TỒN KHO THẤP & HẾT HÀNG',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                      color: lowStockProducts.isNotEmpty
+                          ? Colors.orange.shade900
+                          : Colors.green.shade900,
+                    ),
+                  ),
+                ),
+                if (lowStockProducts.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade700,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${lowStockProducts.length} MẶT HÀNG',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (lowStockProducts.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  const Icon(Icons.shield_outlined, color: AppColors.success, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Toàn bộ $totalProducts sản phẩm trong kho đang ở mức an toàn (tồn kho > 5).',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(12),
+              itemCount: min(4, lowStockProducts.length),
+              separatorBuilder: (_, __) => const Divider(height: 16, thickness: 0.8),
+              itemBuilder: (context, idx) {
+                final product = lowStockProducts[idx];
+                final outOfStockVariants = _getOutOfStockVariants(product);
+                final isCompletelyOutOfStock = product.stock <= 0;
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: product.mainImage.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: product.mainImage,
+                              width: 44,
+                              height: 44,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => Container(
+                                width: 44,
+                                height: 44,
+                                color: AppColors.ultraLightGrey,
+                                child: const Icon(Icons.image, size: 20, color: Colors.grey),
+                              ),
+                              errorWidget: (_, __, ___) => Container(
+                                width: 44,
+                                height: 44,
+                                color: AppColors.ultraLightGrey,
+                                child: const Icon(Icons.image_not_supported, size: 20, color: Colors.grey),
+                              ),
+                            )
+                          : Container(
+                              width: 44,
+                              height: 44,
+                              color: AppColors.ultraLightGrey,
+                              child: const Icon(Icons.checkroom, size: 20, color: Colors.grey),
+                            ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: isCompletelyOutOfStock
+                                      ? Colors.red.shade100
+                                      : Colors.orange.shade100,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  isCompletelyOutOfStock
+                                      ? 'HẾT HÀNG (0)'
+                                      : 'TỒN KHO: ${product.stock}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isCompletelyOutOfStock
+                                        ? Colors.red.shade800
+                                        : Colors.orange.shade900,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                AppFormatters.formatCurrency(product.price),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (outOfStockVariants.isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              'Hết SKU: ${outOfStockVariants.join(', ')}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: Colors.red.shade700,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    OutlinedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AdminProductListScreen(),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        minimumSize: const Size(60, 32),
+                        side: const BorderSide(color: AppColors.primary),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      ),
+                      child: const Text(
+                        '+Stock',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              child: SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AdminProductListScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.arrow_forward, size: 14),
+                  label: Text(
+                    'Xem và nhập kho toàn bộ kho hàng ($totalProducts mặt hàng)',
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.black,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBestSellersRankingWidget(
+    List<ProductModel> top5Products,
+    ProductProvider productProvider,
+  ) {
+    final hasSales = top5Products.isNotEmpty && top5Products.first.soldCount > 0;
+    final maxSold = hasSales ? max(1, top5Products.first.soldCount) : 1;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(
+                  Icons.local_fire_department_rounded,
+                  color: Color(0xFFD97706),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'TOP 5 SẢN PHẨM BÁN CHẠY NHẤT',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Xếp hạng tự động theo tổng lượt bán (soldCount)',
+                      style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (!hasSales)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              alignment: Alignment.center,
+              child: const Text(
+                'Chưa có đơn hàng nào được bán ra trong hệ thống.',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: top5Products.length,
+              separatorBuilder: (_, __) => const Divider(height: 16, thickness: 0.7),
+              itemBuilder: (context, idx) {
+                final product = top5Products[idx];
+                final rank = idx + 1;
+                final ratio = (product.soldCount / maxSold).clamp(0.0, 1.0);
+                final categoryName = _getCategoryName(product.categoryId, productProvider);
+
+                // Màu sắc huy hiệu thứ hạng
+                Color rankBg;
+                Color rankTextColor;
+                if (rank == 1) {
+                  rankBg = const Color(0xFFFEF3C7);
+                  rankTextColor = const Color(0xFFB45309);
+                } else if (rank == 2) {
+                  rankBg = const Color(0xFFF1F5F9);
+                  rankTextColor = const Color(0xFF475569);
+                } else if (rank == 3) {
+                  rankBg = const Color(0xFFFFEDD5);
+                  rankTextColor = const Color(0xFFC2410C);
+                } else {
+                  rankBg = Colors.grey.shade100;
+                  rankTextColor = Colors.grey.shade600;
+                }
+
+                return Row(
+                  children: [
+                    // Huy hiệu thứ hạng
+                    Container(
+                      width: 26,
+                      height: 26,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: rankBg,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: rankTextColor.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        '#$rank',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: rankTextColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // Ảnh thumbnail
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: product.mainImage.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: product.mainImage,
+                              width: 38,
+                              height: 38,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => Container(
+                                width: 38,
+                                height: 38,
+                                color: AppColors.ultraLightGrey,
+                                child: const Icon(Icons.image, size: 18, color: Colors.grey),
+                              ),
+                              errorWidget: (_, __, ___) => Container(
+                                width: 38,
+                                height: 38,
+                                color: AppColors.ultraLightGrey,
+                                child: const Icon(Icons.image_not_supported, size: 18, color: Colors.grey),
+                              ),
+                            )
+                          : Container(
+                              width: 38,
+                              height: 38,
+                              color: AppColors.ultraLightGrey,
+                              child: const Icon(Icons.checkroom, size: 18, color: Colors.grey),
+                            ),
+                    ),
+                    const SizedBox(width: 10),
+                    // Tên & Danh mục
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Text(
+                                categoryName,
+                                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '• ${AppFormatters.formatCurrency(product.price)}',
+                                style: const TextStyle(fontSize: 11, color: AppColors.primary),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: ratio,
+                              minHeight: 4,
+                              backgroundColor: Colors.grey.shade100,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                rank == 1
+                                    ? const Color(0xFFF59E0B)
+                                    : (rank == 2
+                                        ? const Color(0xFF64748B)
+                                        : (rank == 3
+                                            ? const Color(0xFFD97706)
+                                            : AppColors.primary)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Doanh số & Doanh thu
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${product.soldCount} đã bán',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          AppFormatters.formatCurrency(product.soldCount * product.price),
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+        ],
+      ),
     );
   }
 
@@ -486,14 +1399,31 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
 
     // Đếm số lượng đơn theo từng trạng thái
     final totalCount = orders.length;
-    final pendingCount = orders.where((o) => o.status == 'Pending').length;
-    final deliveringCount = orders.where((o) => o.status == 'Delivering').length;
-    final deliveredCount = orders.where((o) => o.status == 'Delivered').length;
+    final pendingCount =
+        orders.where((o) => o.status == OrderModel.statusPending).length;
+    final deliveringCount =
+        orders.where((o) => o.status == OrderModel.statusDelivering).length;
+    final deliveredCount =
+        orders.where((o) => o.status == OrderModel.statusDelivered).length;
+    final returnCount = orders
+        .where((o) =>
+            o.status == OrderModel.statusReturnRequested ||
+            o.status == OrderModel.statusReturned)
+        .length;
+    final cancelledCount =
+        orders.where((o) => o.status == OrderModel.statusCancelled).length;
 
     // Lọc theo trạng thái và từ khóa tìm kiếm
     final filteredOrders = orders.where((order) {
-      if (_adminOrderFilter != 'ALL' && order.status != _adminOrderFilter) {
-        return false;
+      if (_adminOrderFilter != 'ALL') {
+        if (_adminOrderFilter == OrderModel.statusReturnRequested) {
+          if (order.status != OrderModel.statusReturnRequested &&
+              order.status != OrderModel.statusReturned) {
+            return false;
+          }
+        } else if (order.status != _adminOrderFilter) {
+          return false;
+        }
       }
       if (_adminOrderQuery.isNotEmpty) {
         final q = _adminOrderQuery.toLowerCase();
@@ -517,6 +1447,8 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
           pendingCount: pendingCount,
           deliveringCount: deliveringCount,
           deliveredCount: deliveredCount,
+          returnCount: returnCount,
+          cancelledCount: cancelledCount,
         ),
         const Divider(height: 1, thickness: 1, color: AppColors.border),
         Expanded(
@@ -541,6 +1473,8 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
     required int pendingCount,
     required int deliveringCount,
     required int deliveredCount,
+    required int returnCount,
+    required int cancelledCount,
   }) {
     return Container(
       color: AppColors.white,
@@ -594,24 +1528,38 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                 ),
                 const SizedBox(width: 8),
                 _buildAdminFilterChip(
-                  key: 'Pending',
+                  key: OrderModel.statusPending,
                   label: 'Chờ xử lý',
                   count: pendingCount,
                   activeColor: Colors.orange.shade800,
                 ),
                 const SizedBox(width: 8),
                 _buildAdminFilterChip(
-                  key: 'Delivering',
+                  key: OrderModel.statusDelivering,
                   label: 'Đang giao',
                   count: deliveringCount,
                   activeColor: Colors.blue.shade700,
                 ),
                 const SizedBox(width: 8),
                 _buildAdminFilterChip(
-                  key: 'Delivered',
+                  key: OrderModel.statusDelivered,
                   label: 'Hoàn tất',
                   count: deliveredCount,
                   activeColor: AppColors.success,
+                ),
+                const SizedBox(width: 8),
+                _buildAdminFilterChip(
+                  key: OrderModel.statusReturnRequested,
+                  label: 'Đổi / Trả',
+                  count: returnCount,
+                  activeColor: Colors.purple.shade700,
+                ),
+                const SizedBox(width: 8),
+                _buildAdminFilterChip(
+                  key: OrderModel.statusCancelled,
+                  label: 'Đã hủy',
+                  count: cancelledCount,
+                  activeColor: Colors.red.shade700,
                 ),
               ],
             ),
@@ -738,16 +1686,28 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
 
     switch (order.status) {
       case 'Pending':
-        statusColor = Colors.orange;
+        statusColor = Colors.orange.shade800;
         statusText = 'Chờ xử lý';
         break;
       case 'Delivering':
-        statusColor = Colors.blue;
+        statusColor = Colors.blue.shade700;
         statusText = 'Đang giao hàng';
         break;
       case 'Delivered':
         statusColor = AppColors.success;
         statusText = 'Giao thành công';
+        break;
+      case 'ReturnRequested':
+        statusColor = Colors.purple.shade700;
+        statusText = 'Yêu cầu Đổi/Trả';
+        break;
+      case 'Returned':
+        statusColor = Colors.purple.shade900;
+        statusText = 'Đã hoàn trả';
+        break;
+      case 'Cancelled':
+        statusColor = Colors.red.shade700;
+        statusText = 'Đã hủy';
         break;
       default:
         statusColor = Colors.grey;
@@ -856,11 +1816,35 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                     ),
                   ),
                 ),
-              ] else ...[
+              ] else if (order.status == 'Delivered') ...[
                 const Text(
-                  '✓ Đơn hoàn tất',
+                  '✓ Giao hoàn tất',
                   style: TextStyle(
                     color: AppColors.success,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ] else if (order.status == 'Cancelled') ...[
+                Text(
+                  '✕ Đã hủy đơn',
+                  style: TextStyle(
+                    color: Colors.red.shade700,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ] else if (order.status == 'ReturnRequested' || order.status == 'Returned') ...[
+                Text(
+                  '⚡ Đổi / Trả hàng',
+                  style: TextStyle(
+                    color: Colors.purple.shade700,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ] else ...[
+                Text(
+                  order.status,
+                  style: const TextStyle(
+                    color: Colors.grey,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

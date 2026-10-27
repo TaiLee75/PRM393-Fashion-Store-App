@@ -294,12 +294,12 @@ graph TD
 ### 💼 GIAI ĐOẠN 4: NÂNG CẤP TRUNG TÂM QUẢN TRỊ ADMIN (BI PORTAL) & HIỆN ĐẠI HÓA BỘ TEST
 **Nhánh Git:** `feature/phase-4-admin-bi-testing`
 
-- [ ] **Task 4.1: Nâng cấp Tab Tổng quan Admin BI Dashboard (`ShopAdminScreen`)**
-  - [ ] **Khóa Bẫy 5:** Tính toán chính xác **Doanh thu thực thu (Net Revenue)** và **Giá trị đơn trung bình (AOV)**: chỉ cộng tổng tiền của các đơn có `status == 'Delivered'` (tuyệt đối không cộng đơn `Cancelled` hoặc `Returned`).
-  - [ ] Bổ sung bộ lọc thời gian: *Hôm nay / 7 ngày qua / 30 ngày qua / Toàn thời gian*.
-  - [ ] Thẻ KPI hiển thị tách biệt: Chờ duyệt (`Pending`), Đang giao (`Delivering`), Hoàn tất (`Delivered`), Đã hủy (`Cancelled`), Yêu cầu Đổi/Trả (`ReturnRequested` / `Returned`).
-  - [ ] **Widget Cảnh báo Tồn kho thấp / Hết hàng:** Liệt kê các sản phẩm có `stock <= 5` hoặc có biến thể bị hết hàng kèm nút nhập kho nhanh.
-  - [ ] **Bảng xếp hạng Top 5 Sản phẩm Bán chạy nhất (Best Sellers):** Xếp hạng theo `soldCount`.
+- [x] **Task 4.1: Nâng cấp Tab Tổng quan Admin BI Dashboard (`ShopAdminScreen`)**
+  - [x] **Khóa Bẫy 5:** Tính toán chính xác **Doanh thu thực thu (Net Revenue)** và **Giá trị đơn trung bình (AOV)**: chỉ cộng tổng tiền của các đơn có `status == 'Delivered'` (tuyệt đối không cộng đơn `Cancelled` hoặc `Returned`).
+  - [x] Bổ sung bộ lọc thời gian: *Hôm nay / 7 ngày qua / 30 ngày qua / Toàn thời gian*.
+  - [x] Thẻ KPI hiển thị tách biệt: Chờ duyệt (`Pending`), Đang giao (`Delivering`), Hoàn tất (`Delivered`), Đã hủy (`Cancelled`), Yêu cầu Đổi/Trả (`ReturnRequested` / `Returned`).
+  - [x] **Widget Cảnh báo Tồn kho thấp / Hết hàng:** Liệt kê các sản phẩm có `stock <= 5` hoặc có biến thể bị hết hàng kèm nút nhập kho nhanh.
+  - [x] **Bảng xếp hạng Top 5 Sản phẩm Bán chạy nhất (Best Sellers):** Xếp hạng theo `soldCount`.
 
 - [ ] **Task 4.2: Nâng cấp Tab Duyệt Đơn hàng Admin (`ShopAdminScreen`)**
   - [ ] Hiển thị chi tiết từng mặt hàng (Ảnh, Tên, Size, Màu, Số lượng), hình thức nhận hàng (`Giao tận nơi` / `Nhận tại cửa hàng`), ghi chú của khách, và trạng thái thanh toán ngay trên thẻ đơn hàng.
