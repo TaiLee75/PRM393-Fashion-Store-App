@@ -24,13 +24,15 @@ void main() {
       ),
     );
 
-    // Kiểm tra có ít nhất 4 ô nhập liệu (Họ tên, SĐT, Địa chỉ, Avatar URL)
-    expect(find.byType(TextFormField), findsNWidgets(4));
+    // Kiểm tra có ít nhất 4 ô nhập liệu (Họ tên, SĐT, Địa chỉ, Avatar, Chiều cao, Cân nặng)
+    expect(find.byType(TextFormField), findsAtLeastNWidgets(4));
 
     // Kiểm tra có nhãn trường Họ tên, SĐT và Địa chỉ
     expect(find.textContaining('Họ và tên'), findsOneWidget);
     expect(find.textContaining('Số điện thoại'), findsOneWidget);
     expect(find.textContaining('Địa chỉ nhận hàng'), findsOneWidget);
+    expect(find.textContaining('Chiều cao'), findsOneWidget);
+    expect(find.textContaining('Cân nặng'), findsOneWidget);
 
     // Kiểm tra có nút Lưu thay đổi hồ sơ
     expect(find.textContaining('LƯU THAY ĐỔI'), findsOneWidget);
