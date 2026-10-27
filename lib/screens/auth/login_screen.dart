@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
-import '../main_nav_screen.dart';
 
 /// Màn hình Đăng nhập phong cách Uniqlo tối giản, hiện đại
 class LoginScreen extends StatefulWidget {
@@ -36,10 +35,10 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainNavScreen()),
-      );
+      // Đăng nhập thành công, Consumer<AuthProvider> ở MaterialApp.home sẽ tự động kích hoạt MainNavScreen
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     } else if (mounted && authProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -55,10 +54,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await authProvider.signInWithGoogle();
 
     if (success && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainNavScreen()),
-      );
+      // Đăng nhập thành công, Consumer<AuthProvider> ở MaterialApp.home sẽ tự động kích hoạt MainNavScreen
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     } else if (mounted && authProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

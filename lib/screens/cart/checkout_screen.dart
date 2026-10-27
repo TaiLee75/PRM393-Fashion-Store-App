@@ -103,13 +103,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             orderId: orderId,
             totalPrice: totalPaid,
             onFinished: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const MainNavScreen(initialIndex: 2),
-                ),
-                (route) => false,
-              );
+              MainNavScreen.switchToTab(context, 2);
             },
           ),
         );
@@ -147,13 +141,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             actions: [
               ElevatedButton(
                 onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const MainNavScreen(initialIndex: 2),
-                    ),
-                    (route) => false,
-                  );
+                  MainNavScreen.switchToTab(context, 2);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,

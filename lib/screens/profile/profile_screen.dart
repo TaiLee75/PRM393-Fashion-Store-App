@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
-import '../auth/login_screen.dart';
+import '../../providers/order_provider.dart';
+import '../../providers/notification_provider.dart';
+import '../../providers/chat_provider.dart';
 import '../admin/shop_admin_screen.dart';
 import '../map/store_map_screen.dart';
 import '../notifications/notification_screen.dart';
@@ -423,15 +425,20 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 );
 
-                if (confirm == true) {
-                  cartProvider.clearCart();
+                if (confirm == true && context.mounted) {
+                  final orderProvider = context.read<OrderProvider?>();
+                  final notiProvider = context.read<NotificationProvider?>();
+                  final chatProvider = context.read<ChatProvider?>();
+
+                  cartProvider.unloadCartOnLogout();
+                  orderProvider?.resetSession();
+                  notiProvider?.resetSession();
+                  chatProvider?.resetSession();
                   await authProvider.signOut();
                   if (context.mounted) {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      (route) => false,
-                    );
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                    }
                   }
                 }
               },
@@ -476,15 +483,17 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            children: items.map((item) {
-              return ListTile(
+        Material(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: items.map((item) {
+                return ListTile(
                 leading: Icon(
                   item.icon,
                   color: item.iconColor ?? AppColors.black,
@@ -516,8 +525,9 @@ class ProfileScreen extends StatelessWidget {
             }).toList(),
           ),
         ),
-      ],
-    );
+      ),
+    ],
+  );
   }
 }
 

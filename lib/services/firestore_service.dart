@@ -956,6 +956,19 @@ class FirestoreService {
     });
   }
 
+  /// Lắng nghe metadata phòng chat của 1 khách hàng cụ thể (đếm unreadByCustomer)
+  Stream<Map<String, dynamic>?> streamChatRoom(String customerId) {
+    try {
+      return _firestore
+          .collection(colChats)
+          .doc(customerId)
+          .snapshots()
+          .map((snapshot) => snapshot.data());
+    } catch (_) {
+      return const Stream.empty();
+    }
+  }
+
   // ==========================================
   // 9. BRANCHES COLLECTION (Chi nhánh cửa hàng)
   // ==========================================

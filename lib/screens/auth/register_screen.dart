@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../main_nav_screen.dart';
 
 /// Màn hình Đăng ký tài khoản
 class RegisterScreen extends StatefulWidget {
@@ -46,11 +45,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           backgroundColor: AppColors.success,
         ),
       );
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const MainNavScreen()),
-        (route) => false,
-      );
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     } else if (mounted && authProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

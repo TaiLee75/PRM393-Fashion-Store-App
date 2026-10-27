@@ -100,7 +100,7 @@ class MyApp extends StatelessWidget {
           builder: (context, auth, _) {
             // Nếu đã đăng nhập thành công thì vào thẳng MainNavScreen, ngược lại hiển thị LoginScreen
             if (auth.isAuthenticated) {
-              return const MainNavScreen();
+              return MainNavScreen(key: ValueKey(auth.userId));
             }
             return const LoginScreen();
           },
