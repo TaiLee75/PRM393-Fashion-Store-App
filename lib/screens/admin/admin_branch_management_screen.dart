@@ -3,10 +3,13 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/app_validators.dart';
 import '../../models/branch_model.dart';
 import '../../services/firestore_service.dart';
+import '../map/store_map_screen.dart';
 
-/// Màn hình Quản lý Danh sách Chi nhánh Cửa hàng (Admin Branch Management)
+/// Màn hình Quản lý Danh sách Chi nhánh Cửa hàng dành cho Admin (Khóa Bẫy 19)
 class AdminBranchManagementScreen extends StatefulWidget {
-  const AdminBranchManagementScreen({super.key});
+  final FirestoreService? firestoreService;
+
+  const AdminBranchManagementScreen({super.key, this.firestoreService});
 
   @override
   State<AdminBranchManagementScreen> createState() =>
@@ -15,8 +18,15 @@ class AdminBranchManagementScreen extends StatefulWidget {
 
 class _AdminBranchManagementScreenState
     extends State<AdminBranchManagementScreen> {
-  final FirestoreService _firestoreService = FirestoreService();
+  late final FirestoreService _firestoreService;
 
+  @override
+  void initState() {
+    super.initState();
+    _firestoreService = widget.firestoreService ?? FirestoreService();
+  }
+
+  /// Sheet Thêm Chi nhánh mới
   void _showAddBranchSheet(BuildContext context) {
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController();
@@ -32,7 +42,7 @@ class _AdminBranchManagementScreenState
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return StatefulBuilder(
-          builder: (context, setSheetState) {
+          builder: (dialogCtx, setSheetState) {
             return Container(
               padding: EdgeInsets.only(
                 top: 20,
@@ -82,18 +92,88 @@ class _AdminBranchManagementScreenState
                             AppValidators.validateRequired(v, 'Tên chi nhánh'),
                       ),
                       const SizedBox(height: 12),
+
+                      // Địa chỉ kèm nút Ghim Bản đồ
                       TextFormField(
                         controller: addressController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Địa chỉ chi nhánh *',
                           hintText: 'VD: 123 Phố Tràng Tiền, Quận Hoàn Kiếm, Hà Nội',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.location_on_outlined),
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.location_on_outlined),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.map_outlined, color: AppColors.primary),
+                            tooltip: 'Ghim trên Bản đồ',
+                            onPressed: () async {
+                              final result = await Navigator.push<Map<String, dynamic>>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const StoreMapScreen(
+                                    isBranchPicker: true,
+                                  ),
+                                ),
+                              );
+                              if (result != null) {
+                                setSheetState(() {
+                                  if (result['address'] != null) {
+                                    addressController.text = result['address'].toString();
+                                  }
+                                  if (result['latitude'] != null) {
+                                    latController.text = result['latitude'].toString();
+                                  }
+                                  if (result['longitude'] != null) {
+                                    lngController.text = result['longitude'].toString();
+                                  }
+                                });
+                              }
+                            },
+                          ),
                         ),
                         validator: (v) =>
                             AppValidators.validateRequired(v, 'Địa chỉ'),
                       ),
+                      const SizedBox(height: 8),
+
+                      // Nút Ghim Bản đồ trực quan
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final result = await Navigator.push<Map<String, dynamic>>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const StoreMapScreen(
+                                isBranchPicker: true,
+                              ),
+                            ),
+                          );
+                          if (result != null) {
+                            setSheetState(() {
+                              if (result['address'] != null) {
+                                addressController.text = result['address'].toString();
+                              }
+                              if (result['latitude'] != null) {
+                                latController.text = result['latitude'].toString();
+                              }
+                              if (result['longitude'] != null) {
+                                lngController.text = result['longitude'].toString();
+                              }
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.pin_drop_outlined, size: 18),
+                        label: const Text(
+                          'Ghim vị trí trên Bản đồ OpenStreetMap',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 12),
+
                       TextFormField(
                         controller: phoneController,
                         keyboardType: TextInputType.phone,
@@ -107,6 +187,7 @@ class _AdminBranchManagementScreenState
                             AppValidators.validateRequired(v, 'Số điện thoại'),
                       ),
                       const SizedBox(height: 12),
+
                       Row(
                         children: [
                           Expanded(
@@ -147,6 +228,7 @@ class _AdminBranchManagementScreenState
                         ],
                       ),
                       const SizedBox(height: 12),
+
                       // Tọa độ mẫu tiện lợi
                       Wrap(
                         spacing: 8,
@@ -181,6 +263,7 @@ class _AdminBranchManagementScreenState
                         ],
                       ),
                       const SizedBox(height: 24),
+
                       SizedBox(
                         width: double.infinity,
                         height: 48,
@@ -268,7 +351,309 @@ class _AdminBranchManagementScreenState
           },
         );
       },
-    );
+    ).whenComplete(() {
+      nameController.dispose();
+      addressController.dispose();
+      phoneController.dispose();
+      latController.dispose();
+      lngController.dispose();
+    });
+  }
+
+  /// Sheet Chỉnh sửa Chi nhánh hiện có (Khóa Bẫy 19: Cập nhật Firestore)
+  void _showEditBranchSheet(BuildContext context, BranchModel branch) {
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController(text: branch.name);
+    final addressController = TextEditingController(text: branch.address);
+    final phoneController = TextEditingController(text: branch.phone);
+    final latController =
+        TextEditingController(text: branch.latitude.toString());
+    final lngController =
+        TextEditingController(text: branch.longitude.toString());
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setSheetState) {
+            return Container(
+              padding: EdgeInsets.only(
+                top: 20,
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'CHỈNH SỬA CHI NHÁNH',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.1,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(sheetContext),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Tên chi nhánh *',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.storefront_outlined),
+                        ),
+                        validator: (v) =>
+                            AppValidators.validateRequired(v, 'Tên chi nhánh'),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Địa chỉ kèm nút Ghim Bản đồ
+                      TextFormField(
+                        controller: addressController,
+                        decoration: InputDecoration(
+                          labelText: 'Địa chỉ chi nhánh *',
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.location_on_outlined),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.map_outlined, color: AppColors.primary),
+                            tooltip: 'Ghim trên Bản đồ',
+                            onPressed: () async {
+                              final result = await Navigator.push<Map<String, dynamic>>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const StoreMapScreen(
+                                    isBranchPicker: true,
+                                  ),
+                                ),
+                              );
+                              if (result != null) {
+                                setSheetState(() {
+                                  if (result['address'] != null) {
+                                    addressController.text = result['address'].toString();
+                                  }
+                                  if (result['latitude'] != null) {
+                                    latController.text = result['latitude'].toString();
+                                  }
+                                  if (result['longitude'] != null) {
+                                    lngController.text = result['longitude'].toString();
+                                  }
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        validator: (v) =>
+                            AppValidators.validateRequired(v, 'Địa chỉ'),
+                      ),
+                      const SizedBox(height: 8),
+
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final result = await Navigator.push<Map<String, dynamic>>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const StoreMapScreen(
+                                isBranchPicker: true,
+                              ),
+                            ),
+                          );
+                          if (result != null) {
+                            setSheetState(() {
+                              if (result['address'] != null) {
+                                addressController.text = result['address'].toString();
+                              }
+                              if (result['latitude'] != null) {
+                                latController.text = result['latitude'].toString();
+                              }
+                              if (result['longitude'] != null) {
+                                lngController.text = result['longitude'].toString();
+                              }
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.pin_drop_outlined, size: 18),
+                        label: const Text(
+                          'Ghim vị trí trên Bản đồ OpenStreetMap',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      TextFormField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'Số điện thoại hotline *',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.phone_outlined),
+                        ),
+                        validator: (v) =>
+                            AppValidators.validateRequired(v, 'Số điện thoại'),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: latController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              decoration: const InputDecoration(
+                                labelText: 'Vĩ độ (Latitude) *',
+                                border: OutlineInputBorder(),
+                              ),
+                              validator: (v) => AppValidators.validateRequired(
+                                v,
+                                'Vĩ độ',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              controller: lngController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              decoration: const InputDecoration(
+                                labelText: 'Kinh độ (Longitude) *',
+                                border: OutlineInputBorder(),
+                              ),
+                              validator: (v) => AppValidators.validateRequired(
+                                v,
+                                'Kinh độ',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  if (!formKey.currentState!.validate()) return;
+                                  setSheetState(() => isSaving = true);
+
+                                  try {
+                                    final updatedBranch = branch.copyWith(
+                                      name: nameController.text.trim(),
+                                      address: addressController.text.trim(),
+                                      latitude: double.tryParse(
+                                            latController.text.trim(),
+                                          ) ??
+                                          branch.latitude,
+                                      longitude: double.tryParse(
+                                            lngController.text.trim(),
+                                          ) ??
+                                          branch.longitude,
+                                      phone: phoneController.text.trim(),
+                                    );
+
+                                    await _firestoreService
+                                        .updateBranch(updatedBranch);
+
+                                    if (sheetContext.mounted) {
+                                      Navigator.pop(sheetContext);
+                                    }
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            '✅ Đã cập nhật chi nhánh "${updatedBranch.name}"!',
+                                          ),
+                                          backgroundColor: AppColors.success,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    setSheetState(() => isSaving = false);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Lỗi cập nhật chi nhánh: $e'),
+                                          backgroundColor: AppColors.error,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                          child: isSaving
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'CẬP NHẬT CHI NHÁNH',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.1,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      nameController.dispose();
+      addressController.dispose();
+      phoneController.dispose();
+      latController.dispose();
+      lngController.dispose();
+    });
   }
 
   void _confirmDeleteBranch(BuildContext context, BranchModel branch) {
@@ -443,6 +828,18 @@ class _AdminBranchManagementScreenState
                               ),
                             ),
                           ),
+                          // Nút Chỉnh sửa chi nhánh
+                          IconButton(
+                            icon: const Icon(
+                              Icons.edit_outlined,
+                              color: Colors.blue,
+                              size: 22,
+                            ),
+                            tooltip: 'Chỉnh sửa chi nhánh',
+                            onPressed: () =>
+                                _showEditBranchSheet(context, branch),
+                          ),
+                          // Nút Xóa chi nhánh
                           IconButton(
                             icon: const Icon(
                               Icons.delete_outline,

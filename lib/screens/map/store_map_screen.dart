@@ -13,7 +13,13 @@ import '../../services/firestore_service.dart';
 /// và hỗ trợ Chọn tọa độ giao hàng tận nơi (Picker Mode) kèm Reverse Geocoding (Khóa Bẫy 19)
 class StoreMapScreen extends StatefulWidget {
   final bool isPickerMode;
-  const StoreMapScreen({super.key, this.isPickerMode = false});
+  final bool isBranchPicker;
+
+  const StoreMapScreen({
+    super.key,
+    this.isPickerMode = false,
+    this.isBranchPicker = false,
+  });
 
   @override
   State<StoreMapScreen> createState() => _StoreMapScreenState();
@@ -33,13 +39,17 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
   int _geocodeRequestId = 0;
   String? _selectedBranchId;
 
+  bool get isPicker => widget.isPickerMode || widget.isBranchPicker;
+
   @override
   void initState() {
     super.initState();
-    if (widget.isPickerMode) {
+    if (isPicker) {
       // Khóa Bẫy 19: Tuyệt đối không gán sẵn tên/địa chỉ chi nhánh vào địa chỉ nhà của khách
       _hasSelectedLocation = false;
-      _selectedAddressName = 'Chạm vào bản đồ hoặc bấm nút GPS để chọn vị trí giao hàng';
+      _selectedAddressName = widget.isBranchPicker
+          ? 'Chạm vào bản đồ hoặc bấm GPS để chọn vị trí chi nhánh'
+          : 'Chạm vào bản đồ hoặc bấm nút GPS để chọn vị trí giao hàng';
       if (AppConstants.storeBranches.isNotEmpty) {
         _selectedPoint = AppConstants.storeBranches.first['location'] as LatLng;
       }
@@ -210,7 +220,7 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
         });
 
         _mapController.move(userLatLng, 15.5);
-        if (widget.isPickerMode) {
+        if (isPicker) {
           await _reverseGeocode(userLatLng);
         } else {
           setState(() {
@@ -256,7 +266,11 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: Text(
-          widget.isPickerMode ? 'CHỌN ĐỊA CHỈ NHẬN HÀNG' : 'HỆ THỐNG CHI NHÁNH',
+          widget.isBranchPicker
+              ? 'CHỌN TỌA ĐỘ CHI NHÁNH'
+              : (widget.isPickerMode
+                  ? 'CHỌN ĐỊA CHỈ NHẬN HÀNG'
+                  : 'HỆ THỐNG CHI NHÁNH'),
           style: const TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.bold,
@@ -303,7 +317,7 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
                   initialCenter: _selectedPoint,
                   initialZoom: 13.5,
                   onTap: (tapPosition, point) {
-                    if (widget.isPickerMode) {
+                    if (isPicker) {
                       setState(() {
                         _selectedPoint = point;
                         _selectedBranchId = null;
@@ -357,7 +371,7 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
                       }),
 
                       // Marker điểm đang chọn nếu ở chế độ Picker Mode (Khóa Bẫy 19)
-                      if (widget.isPickerMode && _hasSelectedLocation)
+                      if (isPicker && _hasSelectedLocation)
                         Marker(
                           point: _selectedPoint,
                           width: 48,
@@ -393,7 +407,7 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
               ),
 
               // 3. DANH SÁCH CHI NHÁNH LƯỚT NGANG (Chỉ hiển thị khi ở Viewer Mode để không gây nhiễu khi Picker)
-              if (!widget.isPickerMode && branches.isNotEmpty)
+              if (!isPicker && branches.isNotEmpty)
                 Positioned(
                   left: 0,
                   right: 0,
@@ -570,7 +584,7 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
                       ),
 
                       // Ô nhập chi tiết số nhà (Chỉ hiện khi ở Picker Mode)
-                      if (widget.isPickerMode) ...[
+                      if (isPicker) ...[
                         const SizedBox(height: 10),
                         TextField(
                           controller: _detailAddressController,
@@ -595,7 +609,15 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
                                     final fullAddress = detail.isNotEmpty
                                         ? '$detail, $_selectedAddressName'
                                         : _selectedAddressName;
-                                    Navigator.pop(context, fullAddress);
+                                    if (widget.isBranchPicker) {
+                                      Navigator.pop(context, {
+                                        'address': fullAddress,
+                                        'latitude': _selectedPoint.latitude,
+                                        'longitude': _selectedPoint.longitude,
+                                      });
+                                    } else {
+                                      Navigator.pop(context, fullAddress);
+                                    }
                                   }
                                 : null,
                             style: ElevatedButton.styleFrom(
@@ -610,7 +632,9 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
                               _isGeocoding
                                   ? 'ĐANG TÌM ĐỊA CHỈ...'
                                   : (_hasSelectedLocation
-                                      ? 'XÁC NHẬN VỊ TRÍ GIAO HÀNG NÀY'
+                                      ? (widget.isBranchPicker
+                                          ? 'XÁC NHẬN TỌA ĐỘ CHI NHÁNH NÀY'
+                                          : 'XÁC NHẬN VỊ TRÍ GIAO HÀNG NÀY')
                                       : 'CHẠM BẢN ĐỒ ĐỂ CHỌN ĐỊA CHỈ'),
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                             ),

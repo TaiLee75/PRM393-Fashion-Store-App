@@ -294,35 +294,35 @@ graph TD
 ### 💼 GIAI ĐOẠN 4: NÂNG CẤP TRUNG TÂM QUẢN TRỊ ADMIN (BI PORTAL) & HIỆN ĐẠI HÓA BỘ TEST
 **Nhánh Git:** `feature/phase-4-admin-bi-testing`
 
-- [ ] **Task 4.1: Nâng cấp Tab Tổng quan Admin BI Dashboard (`ShopAdminScreen`)**
-  - [ ] **Khóa Bẫy 5:** Tính toán chính xác **Doanh thu thực thu (Net Revenue)** và **Giá trị đơn trung bình (AOV)**: chỉ cộng tổng tiền của các đơn có `status == 'Delivered'` (tuyệt đối không cộng đơn `Cancelled` hoặc `Returned`).
-  - [ ] Bổ sung bộ lọc thời gian: *Hôm nay / 7 ngày qua / 30 ngày qua / Toàn thời gian*.
-  - [ ] Thẻ KPI hiển thị tách biệt: Chờ duyệt (`Pending`), Đang giao (`Delivering`), Hoàn tất (`Delivered`), Đã hủy (`Cancelled`), Yêu cầu Đổi/Trả (`ReturnRequested` / `Returned`).
-  - [ ] **Widget Cảnh báo Tồn kho thấp / Hết hàng:** Liệt kê các sản phẩm có `stock <= 5` hoặc có biến thể bị hết hàng kèm nút nhập kho nhanh.
-  - [ ] **Bảng xếp hạng Top 5 Sản phẩm Bán chạy nhất (Best Sellers):** Xếp hạng theo `soldCount`.
+- [x] **Task 4.1: Nâng cấp Tab Tổng quan Admin BI Dashboard (`ShopAdminScreen`)**
+  - [x] **Khóa Bẫy 5:** Tính toán chính xác **Doanh thu thực thu (Net Revenue)** và **Giá trị đơn trung bình (AOV)**: chỉ cộng tổng tiền của các đơn có `status == 'Delivered'` (tuyệt đối không cộng đơn `Cancelled` hoặc `Returned`).
+  - [x] Bổ sung bộ lọc thời gian: *Hôm nay / 7 ngày qua / 30 ngày qua / Toàn thời gian*.
+  - [x] Thẻ KPI hiển thị tách biệt: Chờ duyệt (`Pending`), Đang giao (`Delivering`), Hoàn tất (`Delivered`), Đã hủy (`Cancelled`), Yêu cầu Đổi/Trả (`ReturnRequested` / `Returned`).
+  - [x] **Widget Cảnh báo Tồn kho thấp / Hết hàng:** Liệt kê các sản phẩm có `stock <= 5` hoặc có biến thể bị hết hàng kèm nút nhập kho nhanh.
+  - [x] **Bảng xếp hạng Top 5 Sản phẩm Bán chạy nhất (Best Sellers):** Xếp hạng theo `soldCount`.
 
-- [ ] **Task 4.2: Nâng cấp Tab Duyệt Đơn hàng Admin (`ShopAdminScreen`)**
-  - [ ] Hiển thị chi tiết từng mặt hàng (Ảnh, Tên, Size, Màu, Số lượng), hình thức nhận hàng (`Giao tận nơi` / `Nhận tại cửa hàng`), ghi chú của khách, và trạng thái thanh toán ngay trên thẻ đơn hàng.
-  - [ ] Bấm vào thẻ đơn hàng để mở `OrderDetailScreen` với đầy đủ quyền Admin.
-  - [ ] Bộ nút điều khiển trạng thái:
+- [x] **Task 4.2: Nâng cấp Tab Duyệt Đơn hàng Admin (`ShopAdminScreen`)**
+  - [x] Hiển thị chi tiết từng mặt hàng (Ảnh, Tên, Size, Màu, Số lượng), hình thức nhận hàng (`Giao tận nơi` / `Nhận tại cửa hàng`), ghi chú của khách, và trạng thái thanh toán ngay trên thẻ đơn hàng.
+  - [x] Bấm vào thẻ đơn hàng để mở `OrderDetailScreen` với đầy đủ quyền Admin.
+  - [x] Bộ nút điều khiển trạng thái:
     - Đơn VietQR `PaymentSubmitted`: Nút **"Xác nhận đã nhận chuyển khoản"** (`paymentStatus = 'Paid'`) hoặc **"Từ chối / Chưa nhận được"** (`rejectPaymentSubmitted` $\rightarrow$ trả về `'Unpaid'` + báo khách quét lại).
     - Đơn `Pending`: Nút **"Duyệt giao hàng"** (`Delivering` — nếu đơn `VIETQR` chưa `'Paid'` thì bật hộp thoại xác nhận nhắc Admin kiểm tra tiền về trước khi giao) hoặc **"Hủy đơn hàng"** (chọn lý do & hoàn kho SKU).
     - Đơn `Delivering`: Nút **"Xác nhận đã giao thành công"** (`Delivered` + tự động cập nhật `paymentStatus = 'Paid'`).
     - Đơn `ReturnRequested`: Nút **"Duyệt Đổi / Trả hàng"** (`status = 'Returned'`, tự động hoàn kho SKU và chuyển `paymentStatus = 'Refunded'`) hoặc **"Từ chối Đổi / Trả"**.
 
-- [ ] **Task 4.3: Nâng cấp Quản lý Kho, Danh mục & Chi nhánh**
-  - [ ] Trong `AdminProductListScreen` ([lib/screens/admin/admin_product_list_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_product_list_screen.dart)):
+- [x] **Task 4.3: Nâng cấp Quản lý Kho, Danh mục & Chi nhánh**
+  - [x] Trong `AdminProductListScreen` ([lib/screens/admin/admin_product_list_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_product_list_screen.dart)):
     - Hiển thị rõ `Tồn kho: X | Đã bán: Y` và trạng thái `Đang bán / Ngừng bán` trên từng thẻ sản phẩm.
     - Thêm nút **"Nhập kho nhanh (+Stock)"** (hỗ trợ nhập thêm số lượng cho từng biến thể SKU) và dialog **"Quản lý Danh mục (`categories`)"** hỗ trợ Admin Thêm / Sửa / Xóa danh mục Firestore.
-  - [ ] **Khóa Bẫy 12 & Bẫy 17:** Trong `AdminProductFormScreen` ([lib/screens/admin/admin_product_form_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_product_form_screen.dart)):
+  - [x] **Khóa Bẫy 12 & Bẫy 17:** Trong `AdminProductFormScreen` ([lib/screens/admin/admin_product_form_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_product_form_screen.dart)):
     - Danh mục nạp động 100% từ `productProvider.categories`; kiểm tra an toàn `effectiveCategoryId` để triệt tiêu lỗi `DropdownButtonFormField AssertionError`.
     - Hỗ trợ đầy đủ kích cỡ `'FreeSize'`, đồng bộ bảng màu và cho phép thêm Màu/Size tùy chỉnh.
     - Quản lý danh sách nhiều ảnh (`imageUrls`), nhập Giá gốc (`originalPrice`), Tồn kho theo từng biến thể SKU (`variantStock`) và chuyển đổi trạng thái `isActive`.
     - Lưu chỉnh sửa bằng cách giữ nguyên `reviews`, `rating`, `soldCount` mới nhất trên Firestore.
-  - [ ] **Khóa Bẫy 19:** Trong `AdminBranchManagementScreen` ([lib/screens/admin/admin_branch_management_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_branch_management_screen.dart)):
+  - [x] **Khóa Bẫy 19:** Trong `AdminBranchManagementScreen` ([lib/screens/admin/admin_branch_management_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_branch_management_screen.dart)):
     - Bổ sung chức năng **Chỉnh sửa chi nhánh (`updateBranch`)**.
     - Bổ sung nút **"Ghim vị trí trên Bản đồ"** để tự động điền Tọa độ và Địa chỉ.
-  - [ ] Trong `AdminChatInboxScreen` ([lib/screens/admin/admin_chat_inbox_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_chat_inbox_screen.dart)):
+  - [x] Trong `AdminChatInboxScreen` ([lib/screens/admin/admin_chat_inbox_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_chat_inbox_screen.dart)):
     - Hiển thị Badge đỏ số tin nhắn chưa đọc của từng khách; kết nối kênh stream Admin riêng biệt không làm ảnh hưởng Tab 3.
 
 - [ ] **Task 4.4: Hiện đại hóa Toàn bộ Bộ Kiểm thử Tự động (`test/`)**

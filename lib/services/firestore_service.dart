@@ -247,11 +247,21 @@ class FirestoreService {
 
       if (skuKey != null && skuKey.isNotEmpty) {
         variantStock[skuKey] = (variantStock[skuKey] ?? 0) + additionalStock;
+      } else if (variantStock.isNotEmpty) {
+        final perSku = (additionalStock / variantStock.length).floor();
+        final remainder = additionalStock % variantStock.length;
+        int count = 0;
+        for (final k in variantStock.keys.toList()) {
+          variantStock[k] =
+              (variantStock[k] ?? 0) + perSku + (count < remainder ? 1 : 0);
+          count++;
+        }
       }
 
       int newTotalStock = currentStock + additionalStock;
       if (variantStock.isNotEmpty) {
-        newTotalStock = variantStock.values.fold<int>(0, (total, q) => total + q);
+        newTotalStock =
+            variantStock.values.fold<int>(0, (total, q) => total + q);
       }
 
       transaction.update(docRef, {

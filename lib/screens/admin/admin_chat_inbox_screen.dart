@@ -29,17 +29,41 @@ class _AdminChatInboxScreenState extends State<AdminChatInboxScreen> {
     final chatProvider = context.watch<ChatProvider>();
     final rooms = chatProvider.adminChatRooms;
 
+    final unreadTotal = chatProvider.unreadAdminTotal;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'HỘP THƯ CSKH & TƯ VẤN',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.1,
-            color: AppColors.white,
-          ),
+        title: Row(
+          children: [
+            const Text(
+              'HỘP THƯ CSKH & TƯ VẤN',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+                color: AppColors.white,
+              ),
+            ),
+            if (unreadTotal > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.error,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$unreadTotal',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
         backgroundColor: AppColors.black,
         foregroundColor: AppColors.white,
@@ -138,10 +162,36 @@ class _AdminChatInboxScreenState extends State<AdminChatInboxScreen> {
                         ),
                       ),
                     ),
-                    trailing: const Icon(
-                      Icons.chevron_right,
-                      color: Colors.grey,
-                      size: 20,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if ((room['unreadByAdmin'] as num?)?.toInt() != null &&
+                            (room['unreadByAdmin'] as num) > 0)
+                          Container(
+                            margin: const EdgeInsets.only(right: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.error,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${room['unreadByAdmin']}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        const Icon(
+                          Icons.chevron_right,
+                          color: Colors.grey,
+                          size: 20,
+                        ),
+                      ],
                     ),
                     onTap: () {
                       Navigator.push(

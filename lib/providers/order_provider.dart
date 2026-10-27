@@ -295,6 +295,9 @@ class OrderProvider extends ChangeNotifier {
         paymentStatus: newStatus == OrderModel.statusDelivered
             ? OrderModel.paymentPaid
             : o.paymentStatus,
+        deliveringAt: newStatus == OrderModel.statusDelivering
+            ? DateTime.now()
+            : o.deliveringAt,
         deliveredAt: newStatus == OrderModel.statusDelivered
             ? DateTime.now()
             : o.deliveredAt,
