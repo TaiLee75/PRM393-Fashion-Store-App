@@ -130,14 +130,14 @@ class CartProvider extends ChangeNotifier {
       }
       _items[existingIndex] = current.copyWith(
         quantity: combinedQty,
-        isSelected: true,
+        isSelected: newItem.isSelected,
       );
     } else {
       int finalQty = newItem.quantity;
       if (maxStock != null && maxStock > 0 && finalQty > maxStock) {
         finalQty = maxStock;
       }
-      _items.add(newItem.copyWith(quantity: finalQty, isSelected: true));
+      _items.add(newItem.copyWith(quantity: finalQty, isSelected: newItem.isSelected));
     }
 
     _recalculateVoucher();
@@ -157,10 +157,14 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
-  /// Chọn tất cả hoặc bỏ chọn tất cả các món trong giỏ
-  void toggleSelectAll(bool isSelected) {
-    _items =
-        _items.map((item) => item.copyWith(isSelected: isSelected)).toList();
+  /// Chọn tất cả hoặc bỏ chọn tất cả các món trong giỏ (loại trừ các món hết hàng nếu có)
+  void toggleSelectAll(bool isSelected, [Set<String>? excludedItemIds]) {
+    _items = _items.map((item) {
+      if (isSelected && excludedItemIds != null && excludedItemIds.contains(item.cartItemId)) {
+        return item.copyWith(isSelected: false);
+      }
+      return item.copyWith(isSelected: isSelected);
+    }).toList();
     _recalculateVoucher();
     notifyListeners();
     _syncWithFirestore();
@@ -252,6 +256,7 @@ class CartProvider extends ChangeNotifier {
     _syncWithFirestore();
     notifyListeners();
   }
+
 
   /// Chỉ xóa các món đã tích chọn thanh toán sau khi đặt hàng thành công (Khóa Bẫy 6)
   void removePurchasedItems() {
