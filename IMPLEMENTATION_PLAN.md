@@ -325,15 +325,15 @@ graph TD
   - [x] Trong `AdminChatInboxScreen` ([lib/screens/admin/admin_chat_inbox_screen.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/lib/screens/admin/admin_chat_inbox_screen.dart)):
     - Hiển thị Badge đỏ số tin nhắn chưa đọc của từng khách; kết nối kênh stream Admin riêng biệt không làm ảnh hưởng Tab 3.
 
-- [ ] **Task 4.4: Hiện đại hóa Toàn bộ Bộ Kiểm thử Tự động (`test/`)**
-  - [ ] Cập nhật các bài test cũ để thích ứng hoàn hảo với các trường dữ liệu và nghiệp vụ mới:
+- [x] **Task 4.4: Hiện đại hóa Toàn bộ Bộ Kiểm thử Tự động (`test/`)**
+  - [x] Cập nhật các bài test cũ để thích ứng hoàn hảo với các trường dữ liệu và nghiệp vụ mới:
     - [test/cart_provider_test.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/test/cart_provider_test.dart): Cập nhật kiểm thử tính tiền theo `isSelected`, đổi phân loại gộp số lượng và công thức phí ship mới.
     - [test/product_provider_test.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/test/product_provider_test.dart): Kiểm thử `availableSizes` có `'FreeSize'`, lọc `isActive`, sắp xếp `popular` theo `soldCount`.
     - [test/checkout_screen_test.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/test/checkout_screen_test.dart): Kiểm thử luồng Giao tận nơi vs Nhận tại cửa hàng và tính tiền theo `checkoutItems`.
     - [test/order_detail_screen_test.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/test/order_detail_screen_test.dart) & [test/order_filter_test.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/test/order_filter_test.dart): Kiểm thử máy trạng thái 6 bước, điều kiện ẩn/hiện nút QR VietQR và tra cứu từ cả 2 nguồn orders.
     - [test/login_screen_test.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/test/login_screen_test.dart) & [test/vietqr_dialog_test.dart](file:///e:/FBT_UNIVERSITY/FBT_UNIVERSITY_KI_8/PRM393/fashion_store_app/test/vietqr_dialog_test.dart): Kiểm thử form quên mật khẩu, cờ `isFromCheckout` và đối soát chuyển khoản.
-  - [ ] Bổ sung bài test mới cho Tồn kho SKU (`variantStock`) và Trạng thái hoàn tiền (`Refunded`).
-  - [ ] Chạy lệnh `flutter test` đảm bảo **100% All tests passed** và `flutter analyze` báo **No issues found**.
+  - [x] Bổ sung bài test mới cho Tồn kho SKU (`variantStock`) và Trạng thái hoàn tiền (`Refunded`).
+  - [x] Chạy lệnh `flutter test` đảm bảo **100% All tests passed** và `flutter analyze` báo **No issues found**.
 
 ---
 

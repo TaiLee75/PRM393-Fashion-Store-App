@@ -28,12 +28,24 @@ class AppValidators {
     return null;
   }
 
+  /// Chuẩn hóa số điện thoại Việt Nam (+84 hoặc 84 về 0, loại bỏ khoảng trắng và dấu gạch)
+  static String normalizePhone(String? value) {
+    if (value == null) return '';
+    var clean = value.trim().replaceAll(RegExp(r'[\s\-\.\(\)]'), '');
+    if (clean.startsWith('+84')) {
+      clean = '0${clean.substring(3)}';
+    } else if (clean.startsWith('84') && clean.length >= 10) {
+      clean = '0${clean.substring(2)}';
+    }
+    return clean;
+  }
+
   /// Kiểm tra Số điện thoại Việt Nam (10 số, đúng đầu số nhà mạng)
   static String? validatePhone(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Vui lòng nhập số điện thoại';
     }
-    final cleanPhone = value.trim().replaceAll(' ', '');
+    final cleanPhone = normalizePhone(value);
     if (!_phoneRegExp.hasMatch(cleanPhone)) {
       return 'Số điện thoại phải gồm 10 số (VD: 0901234567)';
     }

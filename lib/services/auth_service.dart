@@ -69,7 +69,7 @@ class AuthService {
     }
   }
 
-  /// Đăng ký tài khoản mới bằng Email & Mật khẩu
+  /// Đăng ký tài khoản mới bằng Email & Mật khẩu (gửi email xác thực và đăng xuất ngay)
   Future<UserCredential> registerWithEmailPassword(
     String email,
     String password,
@@ -80,9 +80,16 @@ class AuthService {
         email: email.trim(),
         password: password,
       );
-      // Cập nhật displayName trên Firebase User
-      if (credential.user != null && fullName.isNotEmpty) {
-        await credential.user!.updateDisplayName(fullName.trim());
+      // Cập nhật displayName trên Firebase User và gửi email xác thực
+      if (credential.user != null) {
+        if (fullName.isNotEmpty) {
+          await credential.user!.updateDisplayName(fullName.trim());
+        }
+        try {
+          await credential.user!.sendEmailVerification();
+        } catch (_) {}
+        // Đăng xuất ngay để chặn tuyệt đối việc lọt vào phiên đăng nhập khi chưa xác thực
+        await _auth.signOut();
       }
       return credential;
     } on FirebaseAuthException catch (e) {
@@ -90,9 +97,102 @@ class AuthService {
     }
   }
 
+  /// Gửi lại email xác thực cho tài khoản (có hỗ trợ khi người dùng chưa đăng nhập)
+  Future<void> resendVerificationEmail({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      if (credential.user != null) {
+        if (!credential.user!.emailVerified) {
+          await credential.user!.sendEmailVerification();
+        }
+        await _auth.signOut();
+      }
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Xác minh email bằng thông tin đăng nhập và hoàn tất đăng nhập nếu đã bấm link kích hoạt
+  Future<UserCredential?> verifyAndSignIn({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      final user = credential.user;
+      if (user != null) {
+        await user.reload();
+        final verified = _auth.currentUser?.emailVerified ?? false;
+        if (!verified) {
+          // Chưa bấm liên kết trong Gmail -> đăng xuất ngay
+          await _auth.signOut();
+          return null;
+        }
+        return credential;
+      }
+      return null;
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Hủy tài khoản chưa xác thực (Xóa vĩnh viễn khỏi Firebase Auth)
+  Future<void> cancelUnverifiedAccount({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      if (credential.user != null) {
+        await credential.user!.delete();
+      }
+    } catch (_) {
+      // Bỏ qua nếu tài khoản đã bị xóa hoặc sai mật khẩu
+    } finally {
+      try {
+        await _auth.signOut();
+      } catch (_) {}
+    }
+  }
+
+  /// Gửi lại email xác thực tài khoản chính thức từ Google / Firebase
+  Future<void> sendEmailVerification() async {
+    final user = _auth.currentUser;
+    if (user != null && !user.emailVerified) {
+      await user.sendEmailVerification();
+    }
+  }
+
+  /// Kiểm tra xem người dùng hiện tại đã bấm link xác thực trong Gmail chưa
+  Future<bool> isEmailVerified() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      await user.reload();
+      return _auth.currentUser?.emailVerified ?? false;
+    }
+    return false;
+  }
+
   /// Đăng nhập bằng tài khoản Google (OAuth 2.0)
   Future<UserCredential?> signInWithGoogle() async {
     try {
+      // Dọn cache phiên trước để Google Play Services luôn hiển thị hộp thoại chọn tài khoản (Account Chooser)
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         // Người dùng hủy màn hình chọn tài khoản Google
@@ -112,6 +212,23 @@ class AuthService {
       throw _handleAuthException(e);
     } catch (e) {
       throw Exception('Đăng nhập Google thất bại: ${e.toString()}');
+    }
+  }
+
+  /// Thiết lập mật khẩu cho tài khoản Google (giúp tài khoản có thể đăng nhập bằng cả 2 cách)
+  Future<void> setPasswordForGoogleAccount(String newPassword) async {
+    final user = currentUser;
+    if (user == null) {
+      throw Exception('Người dùng chưa đăng nhập. Vui lòng đăng nhập lại.');
+    }
+    if (newPassword.trim().length < 6) {
+      throw Exception('Mật khẩu mới phải có ít nhất 6 ký tự.');
+    }
+    try {
+      await user.updatePassword(newPassword.trim());
+      await user.reload();
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
     }
   }
 

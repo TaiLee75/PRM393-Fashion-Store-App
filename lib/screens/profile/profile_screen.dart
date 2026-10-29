@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -15,206 +16,30 @@ import '../main_nav_screen.dart';
 import '../notifications/notification_screen.dart';
 import 'edit_profile_screen.dart';
 import 'wishlist_screen.dart';
+import '../auth/login_screen.dart';
 
 /// Màn hình Thông tin cá nhân & Phân quyền vai trò (Profile Screen) chuẩn Enterprise
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  /// Hộp thoại Đổi mật khẩu an toàn với cơ chế Re-authentication (Khóa Bẫy 4)
+  /// Hộp thoại Đổi mật khẩu an toàn với cơ chế Re-authentication (StatefulWidget độc lập)
   Future<void> _showChangePasswordDialog(BuildContext context) async {
-    final currentPassCtrl = TextEditingController();
-    final newPassCtrl = TextEditingController();
-    final confirmPassCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    bool isObscuredCurrent = true;
-    bool isObscuredNew = true;
-    bool isSubmitting = false;
-
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.lock_reset, color: AppColors.primary),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'ĐỔI MẬT KHẨU AN TOÀN',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Để bảo mật tài khoản, vui lòng nhập mật khẩu hiện tại trước khi thiết lập mật khẩu mới.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Mật khẩu hiện tại
-                  TextFormField(
-                    controller: currentPassCtrl,
-                    obscureText: isObscuredCurrent,
-                    decoration: InputDecoration(
-                      labelText: 'Mật khẩu hiện tại *',
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          isObscuredCurrent
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
-                        onPressed: () {
-                          setDialogState(() {
-                            isObscuredCurrent = !isObscuredCurrent;
-                          });
-                        },
-                      ),
-                    ),
-                    validator: (v) => AppValidators.validateRequired(
-                      v,
-                      'Mật khẩu hiện tại',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Mật khẩu mới
-                  TextFormField(
-                    controller: newPassCtrl,
-                    obscureText: isObscuredNew,
-                    decoration: InputDecoration(
-                      labelText: 'Mật khẩu mới (tối thiểu 6 ký tự) *',
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.vpn_key_outlined),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          isObscuredNew
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
-                        onPressed: () {
-                          setDialogState(() {
-                            isObscuredNew = !isObscuredNew;
-                          });
-                        },
-                      ),
-                    ),
-                    validator: (v) {
-                      final req = AppValidators.validateRequired(
-                        v,
-                        'Mật khẩu mới',
-                      );
-                      if (req != null) return req;
-                      if (v!.trim().length < 6) {
-                        return 'Mật khẩu mới phải có ít nhất 6 ký tự';
-                      }
-                      if (v.trim() == currentPassCtrl.text.trim()) {
-                        return 'Mật khẩu mới không được trùng mật khẩu cũ';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Xác nhận mật khẩu mới
-                  TextFormField(
-                    controller: confirmPassCtrl,
-                    obscureText: isObscuredNew,
-                    decoration: const InputDecoration(
-                      labelText: 'Xác nhận mật khẩu mới *',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.check_circle_outline),
-                    ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return 'Vui lòng xác nhận mật khẩu mới';
-                      }
-                      if (v.trim() != newPassCtrl.text.trim()) {
-                        return 'Mật khẩu xác nhận không khớp!';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
-              child: const Text('Hủy', style: TextStyle(color: AppColors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: isSubmitting
-                  ? null
-                  : () async {
-                      if (!formKey.currentState!.validate()) return;
-                      setDialogState(() => isSubmitting = true);
-
-                      final auth = context.read<AuthProvider>();
-                      final ok = await auth.changePassword(
-                        currentPassword: currentPassCtrl.text.trim(),
-                        newPassword: newPassCtrl.text.trim(),
-                      );
-
-                      if (ctx.mounted) {
-                        setDialogState(() => isSubmitting = false);
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              ok
-                                  ? '✅ Đổi mật khẩu tài khoản thành công!'
-                                  : (auth.errorMessage ??
-                                      'Đổi mật khẩu thất bại!'),
-                            ),
-                            backgroundColor:
-                                ok ? AppColors.success : AppColors.error,
-                          ),
-                        );
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-              ),
-              child: isSubmitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text('Đổi mật khẩu'),
-            ),
-          ],
-        ),
-      ),
+      builder: (_) => const _ChangePasswordDialog(),
     );
-
-    currentPassCtrl.dispose();
-    newPassCtrl.dispose();
-    confirmPassCtrl.dispose();
   }
+
+  /// Hộp thoại Thiết lập mật khẩu cho tài khoản Google OAuth (StatefulWidget độc lập)
+  Future<void> _showSetPasswordDialog(BuildContext context) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _SetGooglePasswordDialog(),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -257,30 +82,49 @@ class ProfileScreen extends StatelessWidget {
                     height: 84,
                     color: isAdmin ? AppColors.primary : AppColors.black,
                     child: userModel?.avatarUrl.isNotEmpty == true
-                        ? CachedNetworkImage(
-                            imageUrl: userModel!.avatarUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => const Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            ),
-                            errorWidget: (_, __, ___) => Center(
-                              child: Text(
-                                authProvider.userFullName.isNotEmpty
-                                    ? authProvider.userFullName
-                                        .substring(0, 1)
-                                        .toUpperCase()
-                                    : 'U',
-                                style: const TextStyle(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                        ? (userModel!.avatarUrl.startsWith('data:image')
+                            ? Image.memory(
+                                base64Decode(userModel.avatarUrl.split(',')[1]),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Text(
+                                    authProvider.userFullName.isNotEmpty
+                                        ? authProvider.userFullName
+                                            .substring(0, 1)
+                                            .toUpperCase()
+                                        : 'U',
+                                    style: const TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          )
+                              )
+                            : CachedNetworkImage(
+                                imageUrl: userModel.avatarUrl,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                errorWidget: (_, __, ___) => Center(
+                                  child: Text(
+                                    authProvider.userFullName.isNotEmpty
+                                        ? authProvider.userFullName
+                                            .substring(0, 1)
+                                            .toUpperCase()
+                                        : 'U',
+                                    style: const TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ))
                         : Center(
                             child: Text(
                               authProvider.userFullName.isNotEmpty
@@ -555,12 +399,22 @@ class ProfileScreen extends StatelessWidget {
                   );
                 },
               ),
-              _MenuItem(
-                icon: Icons.lock_outline,
-                title: 'Đổi mật khẩu tài khoản',
-                subtitle: 'Xác thực lại và cập nhật mật khẩu an toàn',
-                onTap: () => _showChangePasswordDialog(context),
-              ),
+              if (authProvider.isGoogleProvider && !authProvider.isPasswordProvider)
+                _MenuItem(
+                  icon: Icons.vpn_key_outlined,
+                  iconColor: Colors.amber.shade800,
+                  title: 'Thiết lập mật khẩu ứng dụng',
+                  subtitle:
+                      'Tài khoản Google • Tạo mật khẩu để đăng nhập bằng Email/SĐT',
+                  onTap: () => _showSetPasswordDialog(context),
+                )
+              else
+                _MenuItem(
+                  icon: Icons.lock_outline,
+                  title: 'Đổi mật khẩu tài khoản',
+                  subtitle: 'Xác thực lại và cập nhật mật khẩu an toàn',
+                  onTap: () => _showChangePasswordDialog(context),
+                ),
               _MenuItem(
                 icon: Icons.notifications_outlined,
                 title: 'Thông báo đơn hàng & khuyến mãi',
@@ -714,9 +568,10 @@ class ProfileScreen extends StatelessWidget {
                   chatProv?.resetSession();
                   await authProvider.signOut();
                   if (context.mounted) {
-                    if (Navigator.of(context).canPop()) {
-                      Navigator.of(context).popUntil((route) => route.isFirst);
-                    }
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                    );
                   }
                 }
               },
@@ -1002,3 +857,401 @@ class _MenuItem {
     required this.onTap,
   });
 }
+
+/// Hộp thoại Đổi mật khẩu an toàn (StatefulWidget độc lập - giải phóng controller trong dispose)
+class _ChangePasswordDialog extends StatefulWidget {
+  const _ChangePasswordDialog();
+
+  @override
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _currentPassCtrl;
+  late final TextEditingController _newPassCtrl;
+  late final TextEditingController _confirmPassCtrl;
+  bool _isObscuredCurrent = true;
+  bool _isObscuredNew = true;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPassCtrl = TextEditingController();
+    _newPassCtrl = TextEditingController();
+    _confirmPassCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _currentPassCtrl.dispose();
+    _newPassCtrl.dispose();
+    _confirmPassCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSubmitting = true);
+
+    final auth = context.read<AuthProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+
+    final ok = await auth.changePassword(
+      currentPassword: _currentPassCtrl.text.trim(),
+      newPassword: _newPassCtrl.text.trim(),
+    );
+
+    if (mounted) {
+      setState(() => _isSubmitting = false);
+      nav.pop();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? '✅ Đổi mật khẩu tài khoản thành công!'
+                : (auth.errorMessage ?? 'Đổi mật khẩu thất bại!'),
+          ),
+          backgroundColor: ok ? AppColors.success : AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.lock_reset, color: AppColors.primary),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'ĐỔI MẬT KHẨU AN TOÀN',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Để bảo mật tài khoản, vui lòng nhập mật khẩu hiện tại trước khi thiết lập mật khẩu mới.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Mật khẩu hiện tại
+              TextFormField(
+                controller: _currentPassCtrl,
+                obscureText: _isObscuredCurrent,
+                decoration: InputDecoration(
+                  labelText: 'Mật khẩu hiện tại *',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _isObscuredCurrent
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _isObscuredCurrent = !_isObscuredCurrent;
+                      });
+                    },
+                  ),
+                ),
+                validator: (v) => AppValidators.validateRequired(
+                  v,
+                  'Mật khẩu hiện tại',
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Mật khẩu mới
+              TextFormField(
+                controller: _newPassCtrl,
+                obscureText: _isObscuredNew,
+                decoration: InputDecoration(
+                  labelText: 'Mật khẩu mới (tối thiểu 6 ký tự) *',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.vpn_key_outlined),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _isObscuredNew
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _isObscuredNew = !_isObscuredNew;
+                      });
+                    },
+                  ),
+                ),
+                validator: (v) {
+                  final req = AppValidators.validateRequired(
+                    v,
+                    'Mật khẩu mới',
+                  );
+                  if (req != null) return req;
+                  if (v!.trim().length < 6) {
+                    return 'Mật khẩu mới phải có ít nhất 6 ký tự';
+                  }
+                  if (v.trim() == _currentPassCtrl.text.trim()) {
+                    return 'Mật khẩu mới không được trùng mật khẩu cũ';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Xác nhận mật khẩu mới
+              TextFormField(
+                controller: _confirmPassCtrl,
+                obscureText: _isObscuredNew,
+                decoration: const InputDecoration(
+                  labelText: 'Xác nhận mật khẩu mới *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.check_circle_outline),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Vui lòng xác nhận mật khẩu mới';
+                  }
+                  if (v.trim() != _newPassCtrl.text.trim()) {
+                    return 'Mật khẩu xác nhận không khớp!';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Hủy', style: TextStyle(color: AppColors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: _isSubmitting ? null : _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+          ),
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Đổi mật khẩu'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Hộp thoại Thiết lập mật khẩu cho tài khoản Google OAuth (StatefulWidget độc lập)
+class _SetGooglePasswordDialog extends StatefulWidget {
+  const _SetGooglePasswordDialog();
+
+  @override
+  State<_SetGooglePasswordDialog> createState() =>
+      _SetGooglePasswordDialogState();
+}
+
+class _SetGooglePasswordDialogState extends State<_SetGooglePasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _newPassCtrl;
+  late final TextEditingController _confirmPassCtrl;
+  bool _isObscured = true;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _newPassCtrl = TextEditingController();
+    _confirmPassCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _newPassCtrl.dispose();
+    _confirmPassCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSubmitting = true);
+
+    final auth = context.read<AuthProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+
+    final ok = await auth.setPasswordForGoogleAccount(
+      _newPassCtrl.text.trim(),
+    );
+
+    if (mounted) {
+      setState(() => _isSubmitting = false);
+      nav.pop();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? '✅ Đã thiết lập mật khẩu ứng dụng thành công! Bạn có thể dùng mật khẩu này để đăng nhập.'
+                : (auth.errorMessage ?? 'Thiết lập mật khẩu thất bại!'),
+          ),
+          backgroundColor: ok ? AppColors.success : AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.vpn_key_outlined, color: AppColors.primary),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'THIẾT LẬP MẬT KHẨU ỨNG DỤNG',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, size: 18, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Bạn đang đăng nhập qua Google OAuth. Bạn có thể thiết lập mật khẩu ứng dụng riêng để có thể đăng nhập bằng cả Email/SĐT hoặc Google.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Mật khẩu mới
+              TextFormField(
+                controller: _newPassCtrl,
+                obscureText: _isObscured,
+                decoration: InputDecoration(
+                  labelText: 'Mật khẩu mới (tối thiểu 6 ký tự) *',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.vpn_key_outlined),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _isObscured ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: () => setState(() => _isObscured = !_isObscured),
+                  ),
+                ),
+                validator: (v) {
+                  final req = AppValidators.validateRequired(v, 'Mật khẩu mới');
+                  if (req != null) return req;
+                  if (v!.trim().length < 6) {
+                    return 'Mật khẩu phải có ít nhất 6 ký tự';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Xác nhận mật khẩu mới
+              TextFormField(
+                controller: _confirmPassCtrl,
+                obscureText: _isObscured,
+                decoration: const InputDecoration(
+                  labelText: 'Xác nhận mật khẩu mới *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.check_circle_outline),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Vui lòng xác nhận mật khẩu mới';
+                  }
+                  if (v.trim() != _newPassCtrl.text.trim()) {
+                    return 'Mật khẩu xác nhận không khớp!';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Hủy', style: TextStyle(color: AppColors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: _isSubmitting ? null : _submit,
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Thiết lập mật khẩu'),
+        ),
+      ],
+    );
+  }
+}
+

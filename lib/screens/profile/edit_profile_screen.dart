@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/app_validators.dart';
 import '../../providers/auth_provider.dart';
+import '../map/store_map_screen.dart';
 
 /// Màn hình Chỉnh sửa Hồ sơ cá nhân & Sổ địa chỉ (Edit Profile Screen) chuẩn Enterprise
 class EditProfileScreen extends StatefulWidget {
@@ -127,108 +130,93 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  /// Hộp thoại thêm địa chỉ mới vào Sổ địa chỉ
-  Future<void> _showAddAddressDialog() async {
-    final labelCtrl = TextEditingController(text: 'Nhà riêng');
-    final addrCtrl = TextEditingController();
-    bool setAsDefault = false;
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text(
-            'THÊM ĐỊA CHỈ NHẬN HÀNG',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.8,
+  /// Chọn ảnh đại diện từ thiết bị (Gallery) và nén thành chuỗi Base64
+  Future<void> _pickAvatarFromDevice() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 300,
+        maxHeight: 300,
+        imageQuality: 70, // Nén ảnh chất lượng 70% tối ưu dung lượng < 30KB
+      );
+      if (picked != null) {
+        final bytes = await picked.readAsBytes();
+        final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        setState(() {
+          _avatarUrlController.text = base64String;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Đã tải ảnh từ thiết bị và nén dung lượng tối ưu!'),
+              backgroundColor: AppColors.success,
             ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể chọn ảnh: ${e.toString()}'),
+            backgroundColor: AppColors.error,
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: labelCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Tên gợi nhớ *',
-                    hintText: 'VD: Nhà riêng, Văn phòng...',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: addrCtrl,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Địa chỉ chi tiết *',
-                    hintText: 'Số nhà, tên đường, phường/xã, quận/huyện...',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text(
-                    'Đặt làm địa chỉ nhận hàng mặc định',
-                    style: TextStyle(fontSize: 13),
-                  ),
-                  value: setAsDefault,
-                  activeColor: AppColors.primary,
-                  onChanged: (val) {
-                    setDialogState(() {
-                      setAsDefault = val ?? false;
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Hủy', style: TextStyle(color: AppColors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final label = labelCtrl.text.trim();
-                final address = addrCtrl.text.trim();
-                if (label.isEmpty || address.isEmpty) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(
-                      content: Text('Vui lòng nhập đầy đủ tên và địa chỉ!'),
-                    ),
-                  );
-                  return;
-                }
+        );
+      }
+    }
+  }
 
-                Navigator.pop(ctx);
-                final auth = context.read<AuthProvider>();
-                final ok = await auth.addSavedAddress({
-                  'label': label,
-                  'address': address,
-                  'isDefault': setAsDefault,
-                });
-
-                if (ok && setAsDefault && mounted) {
-                  setState(() {
-                    _addressController.text = address;
-                  });
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-              ),
-              child: const Text('Lưu địa chỉ'),
-            ),
-          ],
-        ),
+  /// Ghim vị trí địa chỉ nhận hàng mặc định trên Bản đồ OpenStreetMap
+  Future<void> _pickDefaultAddressOnMap() async {
+    final res = await Navigator.push<dynamic>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const StoreMapScreen(isPickerMode: true),
       ),
     );
+    if (res != null && mounted) {
+      final pickedAddress = res is Map ? res['address']?.toString() : res.toString();
+      if (pickedAddress != null && pickedAddress.isNotEmpty) {
+        setState(() {
+          _addressController.text = pickedAddress;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('📍 Đã cập nhật địa chỉ từ Bản đồ OpenStreetMap!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    }
+  }
 
-    labelCtrl.dispose();
-    addrCtrl.dispose();
+  /// Hộp thoại thêm địa chỉ mới vào Sổ địa chỉ (Khóa vòng đời, triệt tiêu lỗi _dependents.isEmpty)
+  Future<void> _showAddAddressDialog() async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _AddAddressDialog(),
+    );
+
+    if (result != null && mounted) {
+      final auth = context.read<AuthProvider>();
+      final ok = await auth.addSavedAddress(result);
+
+      if (ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Đã thêm địa chỉ vào Sổ địa chỉ nhận hàng!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        if (result['isDefault'] == true) {
+          setState(() {
+            _addressController.text = result['address'] ?? '';
+          });
+        }
+      }
+    }
   }
 
   @override
@@ -266,21 +254,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   height: 96,
                   color: AppColors.primary,
                   child: currentAvatar.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: currentAvatar,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          ),
-                          errorWidget: (_, __, ___) => const Icon(
-                            Icons.person,
-                            size: 48,
-                            color: Colors.white,
-                          ),
-                        )
+                      ? (currentAvatar.startsWith('data:image')
+                          ? Image.memory(
+                              base64Decode(currentAvatar.split(',')[1]),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person,
+                                size: 48,
+                                color: Colors.white,
+                              ),
+                            )
+                          : CachedNetworkImage(
+                              imageUrl: currentAvatar,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              errorWidget: (_, __, ___) => const Icon(
+                                Icons.person,
+                                size: 48,
+                                color: Colors.white,
+                              ),
+                            ))
                       : const Icon(Icons.person, size: 48, color: Colors.white),
                 ),
               ),
@@ -288,7 +286,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 10),
             const Center(
               child: Text(
-                'Chọn Avatar mẫu hoặc dán link ảnh tùy chỉnh bên dưới:',
+                'Chọn Avatar mẫu hoặc tải ảnh trực tiếp từ thiết bị:',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
             ),
@@ -338,6 +336,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                   );
                 }).toList(),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+            // Nút Tải ảnh từ thiết bị (Nén Base64 không tốn Firebase Storage)
+            Center(
+              child: OutlinedButton.icon(
+                onPressed: _pickAvatarFromDevice,
+                icon: const Icon(Icons.add_photo_alternate_outlined,
+                    size: 18, color: AppColors.primary),
+                label: const Text(
+                  'Tải ảnh đại diện từ thiết bị (Gallery)',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primary),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
               ),
             ),
 
@@ -393,13 +414,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     'Địa chỉ nhận hàng',
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 6),
+
+                // Nút Ghim vị trí trên bản đồ OSM
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _pickDefaultAddressOnMap,
+                    icon: const Icon(Icons.map_outlined,
+                        size: 18, color: AppColors.primary),
+                    label: const Text(
+                      'Ghim vị trí trên Bản đồ (GPS)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
 
                 // Link ảnh đại diện tùy chỉnh (URL)
                 TextFormField(
                   controller: _avatarUrlController,
                   decoration: InputDecoration(
-                    labelText: 'Đường dẫn ảnh đại diện tùy chỉnh (URL)',
+                    labelText: 'Đường dẫn ảnh đại diện tùy chỉnh (URL hoặc Base64)',
                     hintText: 'https://images.unsplash.com/...',
                     border: const OutlineInputBorder(),
                     prefixIcon: const Icon(Icons.link),
@@ -411,6 +451,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return null;
+                    if (v.startsWith('data:image')) return null;
                     return AppValidators.validateUrl(v);
                   },
                   onChanged: (_) => setState(() {}),
@@ -506,6 +547,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     itemBuilder: (context, idx) {
                       final item = savedAddresses[idx];
                       final label = item['label'] as String? ?? 'Địa chỉ';
+                      final recipientName = item['recipientName'] as String? ?? '';
+                      final phone = item['phone'] as String? ?? '';
                       final addr = item['address'] as String? ?? '';
                       final isDef = item['isDefault'] == true;
 
@@ -554,12 +597,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             ],
                           ],
                         ),
-                        subtitle: Text(
-                          addr,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textPrimary,
-                          ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (recipientName.isNotEmpty || phone.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                '${recipientName.isNotEmpty ? recipientName : "Người nhận"}${phone.isNotEmpty ? " • $phone" : ""}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 2),
+                            Text(
+                              addr,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -696,6 +756,232 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Dialog thêm địa chỉ giao hàng mới (StatefulWidget độc lập giải phóng controller trong dispose,
+/// triệt tiêu hoàn toàn lỗi assertion _dependents.isEmpty của Flutter)
+class _AddAddressDialog extends StatefulWidget {
+  const _AddAddressDialog();
+
+  @override
+  State<_AddAddressDialog> createState() => _AddAddressDialogState();
+}
+
+class _AddAddressDialogState extends State<_AddAddressDialog> {
+  final _dialogFormKey = GlobalKey<FormState>();
+  late final TextEditingController _labelCtrl;
+  late final TextEditingController _recipientNameCtrl;
+  late final TextEditingController _phoneCtrl;
+  late final TextEditingController _addressCtrl;
+  bool _isDefault = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _labelCtrl = TextEditingController(text: 'Nhà riêng');
+    _recipientNameCtrl = TextEditingController();
+    _phoneCtrl = TextEditingController();
+    _addressCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _labelCtrl.dispose();
+    _recipientNameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _addressCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickAddressOnMap() async {
+    final res = await Navigator.push<dynamic>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const StoreMapScreen(isPickerMode: true),
+      ),
+    );
+    if (res != null && mounted) {
+      final pickedAddress = res is Map ? res['address']?.toString() : res.toString();
+      if (pickedAddress != null && pickedAddress.isNotEmpty) {
+        setState(() {
+          _addressCtrl.text = pickedAddress;
+        });
+      }
+    }
+  }
+
+  void _submit() {
+    if (_dialogFormKey.currentState?.validate() ?? false) {
+      final data = {
+        'label': _labelCtrl.text.trim().isEmpty ? 'Địa chỉ' : _labelCtrl.text.trim(),
+        'recipientName': _recipientNameCtrl.text.trim(),
+        'phone': AppValidators.normalizePhone(_phoneCtrl.text.trim()),
+        'address': _addressCtrl.text.trim(),
+        'isDefault': _isDefault,
+      };
+      Navigator.of(context).pop(data);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.add_location_alt_outlined, color: AppColors.primary),
+          SizedBox(width: 8),
+          Text(
+            'Thêm địa chỉ nhận hàng',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _dialogFormKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Chọn nhãn gợi nhớ (Chips)
+              const Text(
+                'Tên gợi nhớ:',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                children: ['Nhà riêng', 'Công ty', 'Khác'].map((chip) {
+                  final isSelected = _labelCtrl.text == chip;
+                  return ChoiceChip(
+                    label: Text(
+                      chip,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isSelected ? Colors.white : AppColors.textPrimary,
+                      ),
+                    ),
+                    selected: isSelected,
+                    selectedColor: AppColors.primary,
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _labelCtrl.text = chip;
+                        });
+                      }
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+
+              // Họ tên người nhận
+              TextFormField(
+                controller: _recipientNameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Họ tên người nhận *',
+                  hintText: 'VD: Nguyễn Văn A',
+                  prefixIcon: Icon(Icons.person_outline, size: 20),
+                  isDense: true,
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Vui lòng nhập họ tên người nhận';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Số điện thoại nhận hàng
+              TextFormField(
+                controller: _phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Số điện thoại nhận hàng *',
+                  hintText: 'VD: 0912345678 hoặc +84912345678',
+                  prefixIcon: Icon(Icons.phone_outlined, size: 20),
+                  isDense: true,
+                ),
+                validator: AppValidators.validatePhone,
+              ),
+              const SizedBox(height: 12),
+
+              // Địa chỉ chi tiết
+              TextFormField(
+                controller: _addressCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Địa chỉ chi tiết *',
+                  hintText: 'Số nhà, tên đường, phường/xã, quận/huyện...',
+                  prefixIcon: Icon(Icons.home_outlined, size: 20),
+                  isDense: true,
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Vui lòng nhập địa chỉ nhận hàng';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 8),
+
+              // Nút Ghim vị trí bản đồ OpenStreetMap
+              OutlinedButton.icon(
+                onPressed: _pickAddressOnMap,
+                icon: const Icon(Icons.map_outlined, size: 16, color: AppColors.primary),
+                label: const Text(
+                  'Ghim vị trí trên Bản đồ (GPS)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primary),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: const Size.fromHeight(36),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Checkbox Đặt làm mặc định
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text(
+                  'Đặt làm địa chỉ nhận hàng mặc định',
+                  style: TextStyle(fontSize: 13),
+                ),
+                value: _isDefault,
+                activeColor: AppColors.primary,
+                onChanged: (val) {
+                  setState(() {
+                    _isDefault = val ?? false;
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(null),
+          child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Lưu địa chỉ'),
+        ),
+      ],
     );
   }
 }

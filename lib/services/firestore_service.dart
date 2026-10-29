@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/mock_data.dart';
@@ -11,6 +12,7 @@ import '../models/order_model.dart';
 import '../models/notification_model.dart';
 import '../models/message_model.dart';
 import '../models/branch_model.dart';
+import '../core/utils/app_validators.dart';
 
 /// Dịch vụ làm việc trực tiếp với Cloud Firestore cho toàn bộ 7 Collections + Branches
 /// Tuân thủ nghiêm ngặt tính toàn vẹn dữ liệu (ACID Transaction) và chuẩn Enterprise
@@ -30,9 +32,10 @@ class FirestoreService {
   static const String colNotifications = 'notifications';
   static const String colChats = 'chats';
   static const String colBranches = 'branches';
+  static const String colEmailVerifications = 'email_verifications';
 
   // ==========================================
-  // 1. USERS COLLECTION
+  // 1. USERS COLLECTION & AUTH HELPERS
   // ==========================================
   Future<UserModel?> getUser(String uid) async {
     final doc = await _firestore.collection(colUsers).doc(uid).get();
@@ -49,6 +52,168 @@ class FirestoreService {
 
   Future<void> updateUser(String uid, Map<String, dynamic> data) async {
     await _firestore.collection(colUsers).doc(uid).update(data);
+  }
+
+  /// Tra cứu người dùng bằng Email
+  Future<UserModel?> getUserByEmail(String email) async {
+    try {
+      final cleanEmail = email.trim().toLowerCase();
+      final snapshot = await _firestore
+          .collection(colUsers)
+          .where('email', isEqualTo: cleanEmail)
+          .limit(1)
+          .get();
+      if (snapshot.docs.isEmpty) return null;
+      final doc = snapshot.docs.first;
+      return UserModel.fromMap(doc.data(), doc.id);
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        throw Exception(
+            'Chưa có quyền đọc dữ liệu người dùng. Vui lòng kiểm tra Rules trên Firebase Console.');
+      }
+      rethrow;
+    }
+  }
+
+  /// Tra cứu người dùng bằng Số điện thoại (chuẩn hóa số điện thoại)
+  Future<UserModel?> getUserByPhone(String phone) async {
+    try {
+      final cleanPhone = AppValidators.normalizePhone(phone);
+      if (cleanPhone.isEmpty) return null;
+      final snapshot = await _firestore
+          .collection(colUsers)
+          .where('phone', isEqualTo: cleanPhone)
+          .limit(1)
+          .get();
+      if (snapshot.docs.isEmpty) return null;
+      final doc = snapshot.docs.first;
+      return UserModel.fromMap(doc.data(), doc.id);
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        throw Exception(
+            'Chưa có quyền đọc dữ liệu người dùng. Vui lòng kiểm tra Rules trên Firebase Console.');
+      }
+      rethrow;
+    }
+  }
+
+  /// Kiểm tra Email đã được đăng ký tài khoản chưa
+  Future<bool> checkEmailExists(String email) async {
+    try {
+      final user = await getUserByEmail(email);
+      return user != null;
+    } catch (e) {
+      if (e.toString().contains('Chưa có quyền')) rethrow;
+      return false;
+    }
+  }
+
+  /// Kiểm tra Số điện thoại đã được đăng ký tài khoản chưa
+  Future<bool> checkPhoneExists(String phone) async {
+    try {
+      final user = await getUserByPhone(phone);
+      return user != null;
+    } catch (e) {
+      if (e.toString().contains('Chưa có quyền')) rethrow;
+      return false;
+    }
+  }
+
+  /// Kiểm tra Số điện thoại đã được đăng ký bởi tài khoản khác hay chưa (Chống trùng SĐT khi cập nhật hồ sơ)
+  Future<bool> checkPhoneExistsForOtherUser(String phone, String currentUserId) async {
+    try {
+      final cleanPhone = AppValidators.normalizePhone(phone);
+      if (cleanPhone.isEmpty) return false;
+      final snapshot = await _firestore
+          .collection(colUsers)
+          .where('phone', isEqualTo: cleanPhone)
+          .get();
+      if (snapshot.docs.isEmpty) return false;
+      return snapshot.docs.any((doc) => doc.id != currentUserId);
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        throw Exception(
+            'Chưa có quyền đọc dữ liệu người dùng. Vui lòng kiểm tra Rules trên Firebase Console.');
+      }
+      rethrow;
+    } catch (e) {
+      if (e.toString().contains('Chưa có quyền')) rethrow;
+      return false;
+    }
+  }
+
+  /// Lưu mã OTP xác thực Email kèm thời gian hết hạn (2 phút) và thời gian cho phép gửi lại (1 phút)
+  Future<void> saveEmailOtp({
+    required String email,
+    required String otp,
+    Duration ttl = const Duration(minutes: 2),
+    Duration resendCooldown = const Duration(minutes: 1),
+  }) async {
+    try {
+      final cleanEmail = email.trim().toLowerCase();
+      final now = DateTime.now();
+      await _firestore.collection(colEmailVerifications).doc(cleanEmail).set({
+        'email': cleanEmail,
+        'otp': otp,
+        'createdAt': Timestamp.fromDate(now),
+        'expiresAt': Timestamp.fromDate(now.add(ttl)),
+        'resendAvailableAt': Timestamp.fromDate(now.add(resendCooldown)),
+      });
+    } catch (e) {
+      // Nếu Firestore rules chặn ghi khi chưa đăng nhập, ghi log cảnh báo để AuthProvider kích hoạt fallback in-memory
+      debugPrint('FirestoreService.saveEmailOtp warning: $e');
+      rethrow;
+    }
+  }
+
+  /// Kiểm tra xem người dùng có thể gửi lại mã OTP chưa (Cơ chế Rate Limiting 1 phút)
+  Future<int> getRemainingResendCooldownSeconds(String email) async {
+    try {
+      final cleanEmail = email.trim().toLowerCase();
+      final doc = await _firestore
+          .collection(colEmailVerifications)
+          .doc(cleanEmail)
+          .get();
+      if (!doc.exists || doc.data() == null) return 0;
+      final resendTimestamp = doc.data()!['resendAvailableAt'] as Timestamp?;
+      if (resendTimestamp == null) return 0;
+      final diff =
+          resendTimestamp.toDate().difference(DateTime.now()).inSeconds;
+      return diff > 0 ? diff : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Xác thực mã OTP người dùng nhập vào
+  Future<bool> verifyEmailOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final doc =
+        await _firestore.collection(colEmailVerifications).doc(cleanEmail).get();
+    if (!doc.exists || doc.data() == null) {
+      throw Exception('Mã xác thực không tồn tại hoặc đã hết hạn.');
+    }
+    final data = doc.data()!;
+    final expiresAt = (data['expiresAt'] as Timestamp?)?.toDate();
+    if (expiresAt != null && DateTime.now().isAfter(expiresAt)) {
+      throw Exception(
+          'Mã xác thực OTP đã hết hạn (chỉ có hiệu lực trong 2 phút). Vui lòng yêu cầu gửi lại mã mới.');
+    }
+    final savedOtp = data['otp']?.toString().trim();
+    if (savedOtp != otp.trim()) {
+      throw Exception('Mã xác thực OTP không chính xác. Vui lòng kiểm tra lại.');
+    }
+    // Xác thực thành công: xóa OTP cũ
+    try {
+      await _firestore
+          .collection(colEmailVerifications)
+          .doc(cleanEmail)
+          .delete();
+    } catch (_) {}
+    return true;
   }
 
   // ==========================================
