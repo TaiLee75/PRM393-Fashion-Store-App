@@ -563,16 +563,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             tooltip: 'Chọn vị trí trên Bản đồ',
                             style: IconButton.styleFrom(backgroundColor: AppColors.black),
                             onPressed: () async {
-                              final selectedAddr = await Navigator.push<String>(
+                              final result = await Navigator.push<dynamic>(
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => const StoreMapScreen(isPickerMode: true),
                                 ),
                               );
-                              if (selectedAddr != null && selectedAddr.isNotEmpty) {
-                                setState(() {
-                                  _addressController.text = selectedAddr;
-                                });
+                              if (result != null) {
+                                final selectedAddr =
+                                    result is Map ? result['address']?.toString() : result.toString();
+                                if (selectedAddr != null && selectedAddr.isNotEmpty) {
+                                  setState(() {
+                                    _addressController.text = selectedAddr;
+                                  });
+                                }
                               }
                             },
                           ),

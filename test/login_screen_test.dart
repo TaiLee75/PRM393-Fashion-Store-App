@@ -58,9 +58,9 @@ void main() {
       expect(find.text('STORE'), findsOneWidget);
       expect(find.text('ĐĂNG NHẬP'), findsOneWidget);
 
-      // Các trường nhập liệu Email và Mật khẩu
+      // Các trường nhập liệu Email hoặc Số điện thoại và Mật khẩu
       expect(find.byType(TextFormField), findsNWidgets(2));
-      expect(find.text('Email'), findsOneWidget);
+      expect(find.text('Email hoặc Số điện thoại'), findsOneWidget);
       expect(find.text('Mật khẩu'), findsOneWidget);
 
       // Nút Quên mật khẩu
@@ -98,7 +98,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Kiểm tra thông báo lỗi validation
-      expect(find.text('Vui lòng nhập email'), findsOneWidget);
+      expect(find.text('Vui lòng nhập email hoặc số điện thoại'), findsOneWidget);
       expect(find.text('Vui lòng nhập mật khẩu'), findsOneWidget);
     });
 

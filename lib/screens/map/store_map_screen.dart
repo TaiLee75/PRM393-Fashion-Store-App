@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -38,6 +39,9 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
   bool _isGeocoding = false;
   int _geocodeRequestId = 0;
   String? _selectedBranchId;
+  Timer? _debounceTimer;
+
+  late final Stream<List<BranchModel>> _branchesStream = _firestoreService.streamBranches();
 
   bool get isPicker => widget.isPickerMode || widget.isBranchPicker;
 
@@ -67,6 +71,7 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _mapController.dispose();
     _detailAddressController.dispose();
     super.dispose();
@@ -94,7 +99,6 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
 
     setState(() {
       _isGeocoding = true;
-      _selectedAddressName = 'Đang phân giải địa chỉ...';
     });
 
     String resolved = '';
@@ -105,8 +109,7 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
         'https://nominatim.openstreetmap.org/reverse?format=json&lat=${point.latitude}&lon=${point.longitude}&zoom=18&addressdetails=1',
       );
       final request = await client.getUrl(uri);
-      // Bắt buộc theo chính sách OpenStreetMap Nominatim: User-Agent hợp lệ
-      request.headers.set('User-Agent', 'FashionStoreAppPRM393/1.0');
+      request.headers.set('User-Agent', 'FashionStoreAppPRM393/1.0 (student-project)');
       request.headers.set('Accept-Language', 'vi');
 
       final response = await request.close().timeout(const Duration(seconds: 3));
@@ -114,7 +117,6 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
         final body = await response.transform(utf8.decoder).join();
         final data = jsonDecode(body) as Map<String, dynamic>;
 
-        // Ưu tiên bóc tách các trường địa chỉ chi tiết theo chuẩn Việt Nam
         final addressObj = data['address'] as Map<String, dynamic>?;
         if (addressObj != null) {
           final houseNumber = addressObj['house_number'] as String?;
@@ -158,13 +160,13 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
 
     setState(() {
       _isGeocoding = false;
-      _selectedAddressName = resolved.isNotEmpty
-          ? resolved
-          : 'Vị trí đã chọn: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}';
+      if (resolved.isNotEmpty) {
+        _selectedAddressName = resolved;
+      }
     });
   }
 
-  /// Lấy vị trí GPS hiện tại của người dùng
+  /// Lấy vị trí GPS hiện tại của người dùng (Chống ANR trên máy ảo với getLastKnownPosition trước)
   Future<void> _getCurrentLocation() async {
     setState(() => _isLoadingLocation = true);
 
@@ -174,7 +176,7 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Vui lòng bật dịch vụ định vị (GPS) trên thiết bị của bạn!'),
+              content: Text('Vui lòng bật định vị GPS hoặc chạm trực tiếp vào bản đồ!'),
               backgroundColor: AppColors.warning,
               duration: Duration(seconds: 2),
             ),
@@ -192,7 +194,7 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Quyền định vị bị từ chối vĩnh viễn. Vui lòng cấp quyền trong Cài đặt hoặc chạm trực tiếp trên bản đồ!'),
+              content: Text('Quyền định vị bị từ chối. Vui lòng chạm trực tiếp vào bản đồ để chọn vị trí!'),
               backgroundColor: AppColors.error,
               duration: Duration(seconds: 3),
             ),
@@ -203,34 +205,77 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
 
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
-        final position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            timeLimit: Duration(seconds: 5),
-          ),
-        );
-        final userLatLng = LatLng(position.latitude, position.longitude);
+        // 1. Thử lấy vị trí cache đã biết trước (tức thì 0ms, không gây ANR treo main thread)
+        Position? position;
+        try {
+          position = await Geolocator.getLastKnownPosition();
+        } catch (_) {}
+
+        // 2. Nếu chưa có vị trí cache, thử lấy vị trí hiện tại với timeout an toàn
+        if (position == null) {
+          try {
+            position = await Geolocator.getCurrentPosition(
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.high,
+                timeLimit: Duration(seconds: 3),
+              ),
+            );
+          } catch (_) {
+            position = null;
+          }
+        }
+
+        // 3. Fallback thông minh: Nếu máy ảo chưa được cấp tọa độ trong Extended Controls,
+        // tự động định vị tại FPT Campus Đà Nẵng để trải nghiệm người dùng luôn thông suốt
+        final LatLng targetLatLng;
+        final bool isMockFallback;
+        if (position != null) {
+          targetLatLng = LatLng(position.latitude, position.longitude);
+          isMockFallback = false;
+        } else {
+          targetLatLng = const LatLng(15.9689, 108.2608); // FPT Campus Đà Nẵng
+          isMockFallback = true;
+        }
 
         if (!mounted) return;
         setState(() {
-          _userGpsLocation = userLatLng;
-          _selectedPoint = userLatLng;
+          _userGpsLocation = targetLatLng;
+          _selectedPoint = targetLatLng;
           _selectedBranchId = null;
           _hasSelectedLocation = true;
+          _selectedAddressName =
+              'Vị trí của bạn: ${targetLatLng.latitude.toStringAsFixed(4)}, ${targetLatLng.longitude.toStringAsFixed(4)}';
         });
 
-        _mapController.move(userLatLng, 15.5);
+        _mapController.move(targetLatLng, 15.5);
         if (isPicker) {
-          await _reverseGeocode(userLatLng);
-        } else {
-          setState(() {
-            _selectedAddressName =
-                'Vị trí của bạn: ${userLatLng.latitude.toStringAsFixed(4)}, ${userLatLng.longitude.toStringAsFixed(4)}';
-          });
+          _reverseGeocode(targetLatLng);
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isMockFallback
+                    ? '📍 Đã định vị tại FPT Campus Đà Nẵng (Máy ảo: mở [...] > Location > Send để cấp tọa độ tùy ý)'
+                    : '📍 Đã cập nhật vị trí GPS thành công!',
+              ),
+              backgroundColor: AppColors.primary,
+              duration: const Duration(seconds: 3),
+            ),
+          );
         }
       }
     } catch (_) {
-      // Giữ vị trí mặc định nếu thiết bị không bật GPS hoặc timeout
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chưa thể lấy vị trí GPS. Bạn hãy chạm trực tiếp vào bản đồ để chọn vị trí nhé!'),
+            backgroundColor: AppColors.primary,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoadingLocation = false);
     }
@@ -283,7 +328,7 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
         elevation: 0.5,
       ),
       body: StreamBuilder<List<BranchModel>>(
-        stream: _firestoreService.streamBranches(),
+        stream: _branchesStream,
         builder: (context, snapshot) {
           final rawBranches = (snapshot.hasData && snapshot.data!.isNotEmpty)
               ? snapshot.data!
@@ -322,15 +367,24 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
                         _selectedPoint = point;
                         _selectedBranchId = null;
                         _hasSelectedLocation = true;
+                        _selectedAddressName =
+                            'Vị trí đã chọn: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}';
                       });
-                      _reverseGeocode(point);
+                      _debounceTimer?.cancel();
+                      _debounceTimer =
+                          Timer(const Duration(milliseconds: 500), () {
+                        _reverseGeocode(point);
+                      });
                     }
                   },
                 ),
                 children: [
                   TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    urlTemplate: 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
+                    subdomains: const ['a', 'b', 'c'],
+                    fallbackUrl: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
                     userAgentPackageName: 'com.fptu.prm393.fashion_store_app',
+                    maxZoom: 19.0,
                   ),
                   MarkerLayer(
                     markers: [
@@ -343,8 +397,7 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
                           height: isSelected ? 56 : 46,
                           child: GestureDetector(
                             onTap: () => _focusOnBranch(branch),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
+                            child: Container(
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
                                 color: isSelected ? AppColors.primary : Colors.white,
@@ -609,15 +662,11 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
                                     final fullAddress = detail.isNotEmpty
                                         ? '$detail, $_selectedAddressName'
                                         : _selectedAddressName;
-                                    if (widget.isBranchPicker) {
-                                      Navigator.pop(context, {
-                                        'address': fullAddress,
-                                        'latitude': _selectedPoint.latitude,
-                                        'longitude': _selectedPoint.longitude,
-                                      });
-                                    } else {
-                                      Navigator.pop(context, fullAddress);
-                                    }
+                                    Navigator.pop(context, {
+                                      'address': fullAddress,
+                                      'latitude': _selectedPoint.latitude,
+                                      'longitude': _selectedPoint.longitude,
+                                    });
                                   }
                                 : null,
                             style: ElevatedButton.styleFrom(

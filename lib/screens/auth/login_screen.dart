@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
+import '../main_nav_screen.dart';
 
 /// Màn hình Đăng nhập phong cách Uniqlo tối giản, hiện đại
 class LoginScreen extends StatefulWidget {
@@ -29,20 +30,66 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.signIn(
+    final success = await authProvider.signInWithEmailOrPhone(
       _emailController.text,
       _passwordController.text,
     );
 
     if (success && mounted) {
-      // Đăng nhập thành công, Consumer<AuthProvider> ở MaterialApp.home sẽ tự động kích hoạt MainNavScreen
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      }
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MainNavScreen()),
+        (route) => false,
+      );
     } else if (mounted && authProvider.errorMessage != null) {
+      final isUnverified = authProvider.errorMessage!.contains('chưa được kích hoạt');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(authProvider.errorMessage!),
+          backgroundColor: AppColors.error,
+          duration: Duration(seconds: isUnverified ? 6 : 4),
+          action: isUnverified
+              ? SnackBarAction(
+                  label: 'Gửi lại',
+                  textColor: Colors.amber,
+                  onPressed: () => _handleResendVerificationForLogin(),
+                )
+              : null,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleResendVerificationForLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty || !email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Vui lòng nhập đúng Email và Mật khẩu để gửi lại liên kết kích hoạt.'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.resendVerificationEmail(
+      email: email,
+      password: password,
+    );
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              '🔄 Đã gửi lại email kích hoạt tới $email. Vui lòng kiểm tra Gmail (cả mục Thư rác)!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage ?? 'Gửi lại email thất bại!'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -54,10 +101,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await authProvider.signInWithGoogle();
 
     if (success && mounted) {
-      // Đăng nhập thành công, Consumer<AuthProvider> ở MaterialApp.home sẽ tự động kích hoạt MainNavScreen
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      }
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MainNavScreen()),
+        (route) => false,
+      );
     } else if (mounted && authProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -164,15 +211,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 36),
 
-                  // 1. Ô nhập Email
+                  // 1. Ô nhập Email hoặc Số điện thoại
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'vidu@gmail.com',
-                      prefixIcon: const Icon(Icons.email_outlined),
+                      labelText: 'Email hoặc Số điện thoại',
+                      hintText: 'vidu@gmail.com hoặc 0901234567',
+                      prefixIcon: const Icon(Icons.person_outline),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(4),
                         borderSide: const BorderSide(color: AppColors.border),
@@ -186,10 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return 'Vui lòng nhập email';
-                      }
-                      if (!value.contains('@')) {
-                        return 'Email không hợp lệ';
+                        return 'Vui lòng nhập email hoặc số điện thoại';
                       }
                       return null;
                     },

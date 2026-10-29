@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. USERS COLLECTION (Hồ sơ người dùng)
+    match /users/{userId} {
+      // Cho phép đọc công khai để kiểm tra trùng Email/SĐT và hiển thị tên/avatar người đánh giá
+      allow read: if true;
+      // Chỉ người dùng đã đăng nhập và là chính chủ (hoặc admin) mới được cập nhật hồ sơ
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // 2. CATEGORIES & PRODUCTS (Danh mục & Sản phẩm)
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // 3. CARTS COLLECTION (Giỏ hàng)
+    match /carts/{cartId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 4. ORDERS COLLECTION (Đơn hàng)
+    match /orders/{orderId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 5. NOTIFICATIONS COLLECTION (Thông báo thời gian thực)
+    match /notifications/{notificationId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 6. CHATS COLLECTION & MESSAGES SUB-COLLECTION (Tin nhắn hỗ trợ CSKH)
+    match /chats/{chatId} {
+      allow read, write: if request.auth != null;
+      
+      match /messages/{messageId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+    
+    // 7. BRANCHES COLLECTION (Chi nhánh cửa hàng trên bản đồ)
+    match /branches/{branchId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
