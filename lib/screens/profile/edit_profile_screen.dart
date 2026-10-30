@@ -210,11 +210,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             backgroundColor: AppColors.success,
           ),
         );
-        if (result['isDefault'] == true) {
-          setState(() {
-            _addressController.text = result['address'] ?? '';
-          });
-        }
       }
     }
   }
@@ -624,27 +619,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (!isDef)
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.radio_button_unchecked,
-                                  size: 18,
-                                  color: Colors.grey,
-                                ),
-                                tooltip: 'Đặt làm mặc định',
-                                onPressed: () async {
-                                  await authProvider.updateSavedAddress(
-                                    idx,
-                                    {
-                                      ...item,
-                                      'isDefault': true,
-                                    },
-                                  );
-                                  setState(() {
-                                    _addressController.text = addr;
-                                  });
-                                },
+                            IconButton(
+                              icon: Icon(
+                                isDef ? Icons.check_circle : Icons.radio_button_unchecked,
+                                size: 20,
+                                color: isDef ? AppColors.primary : Colors.grey,
                               ),
+                              tooltip: isDef
+                                  ? 'Chạm để hủy mặc định (ưu tiên địa chỉ hồ sơ)'
+                                  : 'Đặt làm mặc định',
+                              onPressed: () async {
+                                await authProvider.toggleSavedAddressDefault(idx);
+                              },
+                            ),
                             IconButton(
                               icon: const Icon(
                                 Icons.delete_outline,

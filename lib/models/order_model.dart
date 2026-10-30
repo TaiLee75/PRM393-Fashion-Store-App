@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/constants/app_constants.dart';
 import 'cart_item_model.dart';
 
 /// Model đơn đặt hàng (Collection `orders`) chuẩn Enterprise
@@ -96,6 +97,9 @@ class OrderModel {
   /// Đơn hàng đã được thanh toán thành công
   bool get isPaid => paymentStatus == paymentPaid;
 
+  /// Đơn hàng chưa được thanh toán
+  bool get isUnpaid => paymentStatus == paymentUnpaid;
+
   /// Đơn hàng đã được hoàn tiền
   bool get isRefunded => paymentStatus == paymentRefunded;
 
@@ -104,6 +108,24 @@ class OrderModel {
 
   /// Phương thức thanh toán là VietQR
   bool get isVietQr => paymentMethod == 'VIETQR';
+
+  /// Đơn hàng VietQR chưa thanh toán và còn ở trạng thái Chờ xử lý (Pending)
+  bool get isAwaitingPayment => isVietQr && isPending && isUnpaid;
+
+  /// Kiểm tra đơn hàng chờ thanh toán đã quá hạn hay chưa
+  bool isPaymentExpired([int timeoutMinutes = AppConstants.unpaidOrderTimeoutMinutes]) {
+    if (!isAwaitingPayment) return false;
+    final expiry = createdAt.add(Duration(minutes: timeoutMinutes));
+    return DateTime.now().isAfter(expiry);
+  }
+
+  /// Thời gian còn lại để thanh toán (trả về Duration.zero nếu đã hết hạn)
+  Duration remainingPaymentTime([int timeoutMinutes = AppConstants.unpaidOrderTimeoutMinutes]) {
+    if (!isAwaitingPayment) return Duration.zero;
+    final expiry = createdAt.add(Duration(minutes: timeoutMinutes));
+    final diff = expiry.difference(DateTime.now());
+    return diff.isNegative ? Duration.zero : diff;
+  }
 
   /// Phương thức thanh toán là COD (tiền mặt khi nhận hàng)
   bool get isCod => paymentMethod == 'COD';

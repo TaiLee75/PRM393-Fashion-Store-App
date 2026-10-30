@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../core/constants/app_constants.dart';
 import '../models/cart_item_model.dart';
 import '../models/order_model.dart';
 import '../services/firestore_service.dart';
@@ -352,6 +353,19 @@ class OrderProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  /// Tự động quét và hủy các đơn hàng VietQR chưa thanh toán đã quá hạn (Auto-cancel timeout)
+  /// - Hoàn lại tồn kho SKU và chuyển status sang Cancelled
+  Future<void> checkAndCancelExpiredOrders() async {
+    final expiredOrders = _userOrders.where((o) => o.isPaymentExpired()).toList();
+    for (final order in expiredOrders) {
+      await cancelOrder(
+        order.orderId,
+        cancelReason: 'Đơn hàng tự động hủy do quá hạn thanh toán (${AppConstants.unpaidOrderTimeoutMinutes} phút)',
+        cancelledBy: 'system',
+      );
     }
   }
 

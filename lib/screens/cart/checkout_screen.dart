@@ -47,8 +47,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void initState() {
     super.initState();
     final auth = context.read<AuthProvider>();
-    _nameController.text = auth.userFullName;
-    _phoneController.text = auth.userModel?.phone ?? '';
+    _nameController.text = auth.effectiveRecipientName;
+    _phoneController.text = auth.effectivePhone;
     _addressController.text = auth.effectiveDefaultAddress.isNotEmpty
         ? auth.effectiveDefaultAddress
         : (auth.userModel?.defaultAddress ?? '');
@@ -130,6 +130,334 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _appliedVoucher = '';
       _voucherController.clear();
     });
+  }
+
+  /// Mở BottomSheet cho phép người dùng chọn nhanh giữa Địa chỉ hồ sơ chính hoặc các địa chỉ trong Sổ địa chỉ
+  void _showAddressPickerBottomSheet(BuildContext context, AuthProvider authProvider) {
+    final user = authProvider.userModel;
+    final primaryAddress = user?.defaultAddress ?? '';
+    final primaryName = authProvider.userFullName;
+    final primaryPhone = user?.phone ?? '';
+    final savedAddresses = authProvider.savedAddresses;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.location_on, color: AppColors.primary, size: 22),
+                      SizedBox(width: 8),
+                      Text(
+                        'CHỌN ĐỊA CHỈ NHẬN HÀNG',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Divider(height: 1),
+              const SizedBox(height: 14),
+
+              Expanded(
+                child: ListView(
+                  children: [
+                    // MỤC 1: ĐỊA CHỈ HỒ SƠ CHÍNH
+                    InkWell(
+                      onTap: () {
+                        if (primaryAddress.isEmpty) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Hồ sơ chính của bạn chưa có địa chỉ nhận hàng mặc định!'),
+                              backgroundColor: AppColors.warning,
+                            ),
+                          );
+                          return;
+                        }
+                        setState(() {
+                          _nameController.text = primaryName;
+                          _phoneController.text = primaryPhone;
+                          _addressController.text = primaryAddress;
+                        });
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Đã chọn Địa chỉ mặc định trong Hồ sơ cá nhân!'),
+                            backgroundColor: AppColors.success,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _addressController.text.trim() == primaryAddress.trim() && primaryAddress.isNotEmpty
+                              ? AppColors.primaryLight.withValues(alpha: 0.3)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _addressController.text.trim() == primaryAddress.trim() && primaryAddress.isNotEmpty
+                                ? AppColors.primary
+                                : Colors.grey.shade300,
+                            width: _addressController.text.trim() == primaryAddress.trim() && primaryAddress.isNotEmpty
+                                ? 1.5
+                                : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2, right: 8),
+                              child: Icon(
+                                _addressController.text.trim() == primaryAddress.trim() && primaryAddress.isNotEmpty
+                                    ? Icons.radio_button_checked
+                                    : Icons.radio_button_unchecked,
+                                color: _addressController.text.trim() == primaryAddress.trim() && primaryAddress.isNotEmpty
+                                    ? AppColors.primary
+                                    : Colors.grey,
+                                size: 20,
+                              ),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        primaryName.isNotEmpty ? primaryName : 'Tài khoản cá nhân',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                      if (primaryPhone.isNotEmpty) ...[
+                                        const Text(' • ', style: TextStyle(color: Colors.grey)),
+                                        Text(primaryPhone, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                      ],
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.shade50,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'Hồ sơ chính',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.blue.shade700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    primaryAddress.isNotEmpty ? primaryAddress : '(Chưa thiết lập địa chỉ trong hồ sơ)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: primaryAddress.isNotEmpty ? AppColors.textSecondary : Colors.red.shade400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // MỤC 2: SỔ ĐỊA CHỈ PHỤ
+                    if (savedAddresses.isNotEmpty) ...[
+                      Row(
+                        children: [
+                          const Icon(Icons.bookmark, size: 16, color: AppColors.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            'SỔ ĐỊA CHỈ ĐÃ LƯU (${savedAddresses.length})',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ...savedAddresses.asMap().entries.map((entry) {
+                        final idx = entry.key;
+                        final item = entry.value;
+                        final label = item['label'] as String? ?? 'Địa chỉ ${idx + 1}';
+                        final recipient = item['recipientName'] as String? ?? '';
+                        final phone = item['phone'] as String? ?? '';
+                        final address = item['address'] as String? ?? '';
+                        final isDef = item['isDefault'] == true;
+                        final isSelected = _addressController.text.trim() == address.trim() && address.isNotEmpty;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                if (recipient.trim().isNotEmpty) {
+                                  _nameController.text = recipient.trim();
+                                }
+                                if (phone.trim().isNotEmpty) {
+                                  _phoneController.text = phone.trim();
+                                }
+                                _addressController.text = address.trim();
+                              });
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Đã chọn địa chỉ: $label!'),
+                                  backgroundColor: AppColors.success,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppColors.primaryLight.withValues(alpha: 0.3)
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                                  width: isSelected ? 1.5 : 1.0,
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2, right: 8),
+                                    child: Icon(
+                                      isSelected
+                                          ? Icons.radio_button_checked
+                                          : Icons.radio_button_unchecked,
+                                      color: isSelected ? AppColors.primary : Colors.grey,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              label,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            if (isDef) ...[
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.primaryLight,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Text(
+                                                  'Mặc định',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        if (recipient.isNotEmpty || phone.isNotEmpty) ...[
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            '${recipient.isNotEmpty ? recipient : "Người nhận"}${phone.isNotEmpty ? " • $phone" : ""}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          address,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ] else ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: const Text(
+                          'Sổ địa chỉ phụ đang trống. Bạn có thể thêm địa chỉ cơ quan, nhà người thân trong phần Chỉnh sửa hồ sơ để giao hàng nhanh hơn.',
+                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _handlePlaceOrder() async {
@@ -263,6 +591,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               orderId: orderId,
               totalPrice: pricing.finalTotalPrice,
               isFromCheckout: true,
+              createdAt: DateTime.now(),
               onFinished: () {
                 MainNavScreen.switchToTab(context, 2);
               },
@@ -534,7 +863,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   const SizedBox(height: 12),
 
                   if (_deliveryMethod == 'DELIVERY') ...[
-                    // Địa chỉ giao hàng tận nơi
+                    // Tiêu đề & Nút chọn nhanh từ Sổ địa chỉ
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Địa chỉ nhận hàng chi tiết *',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => _showAddressPickerBottomSheet(context, authProvider),
+                          borderRadius: BorderRadius.circular(4),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.bookmark_outline, size: 15, color: AppColors.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  authProvider.savedAddresses.isNotEmpty
+                                      ? 'Sổ địa chỉ (${authProvider.savedAddresses.length})'
+                                      : 'Chọn từ Sổ địa chỉ',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -543,7 +909,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             controller: _addressController,
                             maxLines: 2,
                             decoration: const InputDecoration(
-                              labelText: 'Địa chỉ nhận hàng chi tiết *',
+                              hintText: 'Nhập số nhà, tên đường, phường/xã...',
                               border: OutlineInputBorder(),
                               isDense: true,
                               prefixIcon: Icon(Icons.location_on_outlined, size: 20),

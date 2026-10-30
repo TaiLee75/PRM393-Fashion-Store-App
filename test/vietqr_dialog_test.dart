@@ -7,20 +7,42 @@ import 'package:fashion_store_app/models/order_model.dart';
 import 'package:fashion_store_app/providers/order_provider.dart';
 import 'package:fashion_store_app/screens/cart/widgets/vietqr_dialog.dart';
 import 'package:fashion_store_app/services/firestore_service.dart';
+import 'package:fashion_store_app/services/sepay_service.dart';
+
+import 'dart:async';
 
 class FakeFirestoreServiceForVietQr extends FirestoreService {
   final Map<String, OrderModel> ordersDb = {};
+  final Map<String, StreamController<OrderModel?>> controllers = {};
+
+  StreamController<OrderModel?> _getController(String orderId) {
+    return controllers.putIfAbsent(
+      orderId,
+      () => StreamController<OrderModel?>.broadcast(),
+    );
+  }
 
   @override
   Stream<OrderModel?> streamOrder(String orderId) {
-    return Stream.value(ordersDb[orderId]);
+    final controller = _getController(orderId);
+    Future.microtask(() {
+      if (!controller.isClosed) {
+        controller.add(ordersDb[orderId]);
+      }
+    });
+    return controller.stream;
   }
 
   @override
   Future<void> confirmPaymentPaid(String orderId) async {
     final current = ordersDb[orderId];
     if (current != null) {
-      ordersDb[orderId] = current.copyWith(paymentStatus: OrderModel.paymentPaid);
+      final updated = current.copyWith(paymentStatus: OrderModel.paymentPaid);
+      ordersDb[orderId] = updated;
+      final controller = _getController(orderId);
+      if (!controller.isClosed) {
+        controller.add(updated);
+      }
     }
   }
 
@@ -28,10 +50,22 @@ class FakeFirestoreServiceForVietQr extends FirestoreService {
   Future<void> confirmPaymentSubmitted(String orderId, {String? transactionRef}) async {
     final current = ordersDb[orderId];
     if (current != null) {
-      ordersDb[orderId] = current.copyWith(
+      final updated = current.copyWith(
         paymentStatus: OrderModel.paymentSubmitted,
       );
+      ordersDb[orderId] = updated;
+      final controller = _getController(orderId);
+      if (!controller.isClosed) {
+        controller.add(updated);
+      }
     }
+  }
+
+  void dispose() {
+    for (final c in controllers.values) {
+      c.close();
+    }
+    controllers.clear();
   }
 }
 
@@ -166,54 +200,12 @@ void main() {
       expect(find.text('ĐẶT HÀNG THÀNH CÔNG!'), findsNothing);
     });
 
-    testWidgets('4. Bấm "TÔI ĐÃ CHUYỂN KHOẢN" mở Popup nhập mã giao dịch và cập nhật PaymentSubmitted',
-        (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(800, 1600);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-
-      await tester.pumpWidget(buildTestableDialog());
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      // Nút TÔI ĐÃ CHUYỂN KHOẢN
-      final transferBtn = find.text('TÔI ĐÃ CHUYỂN KHOẢN');
-      expect(transferBtn, findsOneWidget);
-      await tester.tap(transferBtn);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      // Popup xác nhận mở lên
-      expect(find.text('Xác nhận đã chuyển khoản'), findsOneWidget);
-
-      // Nhập mã giao dịch ngân hàng
-      final refInput = find.widgetWithText(TextField, 'Mã giao dịch ngân hàng');
-      expect(refInput, findsOneWidget);
-      await tester.enterText(refInput, 'FT260999888');
-
-      // Bấm Xác nhận gửi
-      final confirmBtn = find.text('Xác nhận gửi');
-      await tester.tap(confirmBtn);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      // Trạng thái đã gửi thông báo thành công
-      expect(
-        find.textContaining('Đã gửi thông báo chuyển khoản thành công'),
-        findsOneWidget,
-      );
-
-      // Hiển thị badge chờ shop duyệt
-      expect(
-        find.textContaining('Đã gửi xác nhận chuyển khoản. Hệ thống sẽ tự động đóng khi Shop duyệt!'),
-        findsOneWidget,
-      );
+    tearDown(() {
+      SepayService.mockCheckHandler = null;
+      fakeFirestoreService.dispose();
     });
 
-    testWidgets('5. Hiển thị Nút Sandbox Demo Mode phục vụ Hội đồng Chấm điểm',
+    testWidgets('4. Khi đơn hàng chuyển sang Paid (Live Stream / SePay), hiển thị THANH TOÁN THÀNH CÔNG',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(800, 1600);
       tester.view.devicePixelRatio = 1.0;
@@ -222,12 +214,83 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
 
-      await tester.pumpWidget(buildTestableDialog());
+      bool isFinished = false;
+
+      await tester.pumpWidget(
+        buildTestableDialog(
+          onFinished: () => isFinished = true,
+        ),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      // Nút Giả lập Webhook Ngân hàng (Demo)
-      expect(find.textContaining('Giả lập Webhook Ngân hàng (Demo)'), findsOneWidget);
+      // Ban đầu hiển thị dialog với nút XEM ĐƠN HÀNG CỦA TÔI
+      expect(find.text('XEM ĐƠN HÀNG CỦA TÔI'), findsOneWidget);
+
+      // Kích hoạt thanh toán thành công
+      await orderProvider.confirmPaymentPaid(sampleOrder.orderId);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Kiểm tra chuyển sang màn hình THANH TOÁN THÀNH CÔNG!
+      expect(find.text('THANH TOÁN THÀNH CÔNG!'), findsOneWidget);
+
+      // Đợi hoàn tất bộ đếm 1.5s tự động đóng dialog
+      await tester.pump(const Duration(milliseconds: 1600));
+      expect(isFinished, true);
+    });
+
+    testWidgets('5. Hiển thị Đồng hồ đếm ngược và Màn hình Hết hạn khi đơn quá thời gian 2 phút',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      // 5a. Đơn hàng còn trong hạn thanh toán (vừa tạo)
+      await tester.pumpWidget(
+        buildTestableDialog(
+          isFromCheckout: true,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Hiển thị thanh đếm ngược thời gian thanh toán
+      expect(find.textContaining('Hạn thanh toán:'), findsOneWidget);
+
+      // 5b. Đơn hàng đã quá hạn thanh toán (tạo từ 3 phút trước)
+      final expiredOrder = sampleOrder.copyWith(
+        orderId: 'ORD_EXPIRED_001',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 3)),
+      );
+      fakeFirestoreService.ordersDb[expiredOrder.orderId] = expiredOrder;
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<OrderProvider>.value(value: orderProvider),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: VietQrPaymentDialog(
+                orderId: expiredOrder.orderId,
+                totalPrice: expiredOrder.totalPrice,
+                isFromCheckout: false,
+                createdAt: expiredOrder.createdAt,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Hiển thị màn hình ĐƠN HÀNG ĐÃ HẾT HẠN
+      expect(find.text('ĐƠN HÀNG ĐÃ HẾT HẠN'), findsOneWidget);
+      expect(find.textContaining('đã quá thời hạn thanh toán (2 phút)'), findsOneWidget);
     });
   });
 }

@@ -426,7 +426,7 @@ void main() {
       expect(cartProvider.items.first.cartItemId, 'item_b');
     });
 
-    testWidgets('9. VietQrPaymentDialog hiển thị QR code, nút Tôi đã chuyển khoản và Sandbox Demo', (tester) async {
+    testWidgets('9. VietQrPaymentDialog hiển thị QR code, Hạn thanh toán và Tự động đối soát SePay', (tester) async {
       await tester.pumpWidget(createTestWidget(
         child: const VietQrPaymentDialog(
           orderId: 'order_test_12345',
@@ -442,8 +442,77 @@ void main() {
 
       expect(find.text('ĐẶT HÀNG THÀNH CÔNG!'), findsOneWidget);
       expect(find.textContaining('MBBank - Ngân hàng TMCP Quân Đội'), findsOneWidget);
-      expect(find.text('TÔI ĐÃ CHUYỂN KHOẢN'), findsOneWidget);
-      expect(find.textContaining('Giả lập Webhook Ngân hàng (Demo)'), findsOneWidget);
+      expect(find.text('XEM ĐƠN HÀNG CỦA TÔI'), findsOneWidget);
+      expect(find.textContaining('Tự động đối soát MBBank Napas 24/7 qua SePay'), findsOneWidget);
+    });
+
+    testWidgets('10. CheckoutScreen: Bộ chọn Sổ địa chỉ 1 chạm mở BottomSheet và tự động điền Tên, SĐT, Địa chỉ', (tester) async {
+      authProvider.setMockUser(UserModel(
+        uid: 'user_1',
+        email: 'user@test.com',
+        fullName: 'Nguyễn Văn Test',
+        phone: '0901234567',
+        defaultAddress: '123 Đường Trần Phú, Đà Nẵng',
+        savedAddresses: [
+          {
+            'label': 'Công ty',
+            'recipientName': 'Lê Văn Đồng Nghiệp',
+            'phone': '0988776655',
+            'address': 'Toà nhà FPT, Quận Ngũ Hành Sơn, Đà Nẵng',
+            'isDefault': false,
+          },
+        ],
+        role: 'customer',
+        createdAt: testDate,
+      ));
+
+      cartProvider.addItem(const CartItemModel(
+        cartItemId: 'prod_1_S_Trắng',
+        productId: 'prod_1',
+        productName: 'Áo Thun Cotton Compact',
+        imageUrl: 'https://images.unsplash.com/photo-1.jpg',
+        price: 350000,
+        size: 'S',
+        color: 'Trắng',
+        quantity: 1,
+        isSelected: true,
+      ));
+
+      await tester.pumpWidget(createTestWidget(
+        child: const CheckoutScreen(),
+        authProvider: authProvider,
+        productProvider: productProvider,
+        cartProvider: cartProvider,
+        orderProvider: orderProvider,
+      ));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // 1. Kiểm tra ban đầu: Nạp thông tin từ Hồ sơ chính (vì trong sổ không có mặc định)
+      expect(find.text('123 Đường Trần Phú, Đà Nẵng'), findsOneWidget);
+      expect(find.text('Nguyễn Văn Test'), findsOneWidget);
+      expect(find.text('0901234567'), findsOneWidget);
+
+      // 2. Thấy nút Sổ địa chỉ
+      expect(find.text('Sổ địa chỉ (1)'), findsOneWidget);
+
+      // 3. Bấm mở BottomSheet
+      await tester.tap(find.text('Sổ địa chỉ (1)'));
+      await tester.pumpAndSettle();
+
+      // Kiểm tra trong BottomSheet hiển thị cả Hồ sơ chính và Địa chỉ Công ty
+      expect(find.text('CHỌN ĐỊA CHỈ NHẬN HÀNG'), findsOneWidget);
+      expect(find.text('Hồ sơ chính'), findsOneWidget);
+      expect(find.text('Công ty'), findsOneWidget);
+      expect(find.text('Toà nhà FPT, Quận Ngũ Hành Sơn, Đà Nẵng'), findsOneWidget);
+
+      // 4. Chọn địa chỉ Công ty
+      await tester.tap(find.text('Công ty'));
+      await tester.pumpAndSettle();
+
+      // 5. Kiểm tra form tự động điền đồng bộ cả Bộ ba thông tin (Khóa Bẫy Đồng bộ)
+      expect(find.text('Toà nhà FPT, Quận Ngũ Hành Sơn, Đà Nẵng'), findsOneWidget);
+      expect(find.text('Lê Văn Đồng Nghiệp'), findsOneWidget);
+      expect(find.text('0988776655'), findsOneWidget);
     });
   });
 }

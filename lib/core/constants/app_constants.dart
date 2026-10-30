@@ -178,11 +178,17 @@ class AppConstants {
     },
   ];
 
-  // 4. Cấu hình Cổng thanh toán VietQR Napas247
+  // 4. Cấu hình Cổng thanh toán VietQR Napas247 & Cổng SePay
   static const String bankId = 'MB'; // MBBank (Ngân hàng TMCP Quân Đội)
   static const String bankName = 'MBBank - Ngân hàng TMCP Quân Đội';
-  static const String bankAccountNo = '0987654321';
-  static const String bankAccountName = 'FASHION STORE PRM393';
+  static const String bankAccountNo = '0844332333';
+  static const String bankAccountName = 'Le Nguyen Minh Tai';
+  static const String sepayApiToken = 'LB6M6CPB50XNPO2YTVFG1YRLZWEQP4DMGTKRN9SVKXF5Q27LNUH31TNHWAQ0ABLH';
+
+  /// Thời gian tối đa chờ khách thanh toán VietQR trước khi tự động hủy đơn (phút)
+  /// - Demo đồ án: 2 phút (để chấm điểm và test nhanh).
+  /// - Thực tế thương mại điện tử (Shopee/Lazada): 1440 phút (24 giờ).
+  static const int unpaidOrderTimeoutMinutes = 2;
 
   /// Tạo đường link mã QR thanh toán động VietQR Napas247 theo chuẩn ngân hàng
   static String generateVietQrUrl({
