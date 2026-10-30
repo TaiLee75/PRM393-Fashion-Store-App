@@ -59,6 +59,10 @@ class AuthProvider extends ChangeNotifier {
   Map<String, num>? get bodyMeasurements => _userModel?.bodyMeasurements;
   String get effectiveDefaultAddress =>
       _userModel?.effectiveDefaultAddress ?? '';
+  String get effectiveRecipientName =>
+      _userModel?.effectiveRecipientName ?? userFullName;
+  String get effectivePhone =>
+      _userModel?.effectivePhone ?? (_userModel?.phone ?? '');
   double? get savedHeight => _userModel?.savedHeight;
   double? get savedWeight => _userModel?.savedWeight;
 
@@ -568,33 +572,11 @@ class AuthProvider extends ChangeNotifier {
         cleanPhoneToSave = cleanPhone;
       }
 
-      // 2. Đồng bộ 2 chiều với savedAddresses nếu có defaultAddress mới
-      List<Map<String, dynamic>> updatedAddresses =
-          List<Map<String, dynamic>>.from(_userModel!.savedAddresses);
-
-      if (defaultAddress != null && defaultAddress.trim().isNotEmpty) {
-        final defIndex =
-            updatedAddresses.indexWhere((a) => a['isDefault'] == true);
-        if (defIndex >= 0) {
-          updatedAddresses[defIndex] =
-              Map<String, dynamic>.from(updatedAddresses[defIndex])
-                ..['address'] = defaultAddress.trim();
-        } else if (updatedAddresses.isEmpty) {
-          updatedAddresses.add({
-            'name': 'Địa chỉ mặc định',
-            'phone': cleanPhoneToSave ?? _userModel!.phone,
-            'address': defaultAddress.trim(),
-            'isDefault': true,
-          });
-        }
-      }
-
       final updated = _userModel!.copyWith(
         fullName: fullName ?? _userModel!.fullName,
         phone: cleanPhoneToSave ?? _userModel!.phone,
         defaultAddress: defaultAddress ?? _userModel!.defaultAddress,
         avatarUrl: avatarUrl ?? _userModel!.avatarUrl,
-        savedAddresses: updatedAddresses,
       );
       await _firestoreService.saveUser(updated);
       _userModel = updated;
@@ -613,7 +595,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Thêm địa chỉ mới vào Sổ địa chỉ (Đồng bộ trực tiếp defaultAddress)
+  /// Thêm địa chỉ mới vào Sổ địa chỉ (Không ép buộc mặc định, không can thiệp defaultAddress hồ sơ)
   Future<bool> addSavedAddress(Map<String, dynamic> address) async {
     if (_userModel == null) return false;
     _setLoading(true);
@@ -623,29 +605,18 @@ class AuthProvider extends ChangeNotifier {
       final updatedAddresses =
           List<Map<String, dynamic>>.from(_userModel!.savedAddresses);
 
-      // Nếu địa chỉ mới là mặc định thì bỏ cờ mặc định của các địa chỉ cũ
+      // Nếu người dùng chủ động chọn địa chỉ này làm mặc định -> gỡ cờ mặc định của các địa chỉ cũ trong sổ
       if (address['isDefault'] == true) {
         for (var i = 0; i < updatedAddresses.length; i++) {
           updatedAddresses[i] =
               Map<String, dynamic>.from(updatedAddresses[i])..['isDefault'] = false;
         }
-      } else if (updatedAddresses.isEmpty) {
-        // Nếu là địa chỉ đầu tiên thì tự động đặt làm mặc định
-        address = Map<String, dynamic>.from(address)..['isDefault'] = true;
       }
 
-      updatedAddresses.add(address);
-
-      // Tìm địa chỉ mặc định để đồng bộ cả trường defaultAddress
-      final defaultItem = updatedAddresses.firstWhere(
-        (a) => a['isDefault'] == true,
-        orElse: () => updatedAddresses.first,
-      );
-      final effectiveAddr = defaultItem['address'] as String? ?? '';
+      updatedAddresses.add(Map<String, dynamic>.from(address));
 
       final updated = _userModel!.copyWith(
         savedAddresses: updatedAddresses,
-        defaultAddress: effectiveAddr.isNotEmpty ? effectiveAddr : null,
       );
       await _firestoreService.saveUser(updated);
       _userModel = updated;
@@ -680,17 +651,10 @@ class AuthProvider extends ChangeNotifier {
         }
       }
 
-      updatedAddresses[index] = address;
-
-      final defaultItem = updatedAddresses.firstWhere(
-        (a) => a['isDefault'] == true,
-        orElse: () => updatedAddresses.first,
-      );
-      final effectiveAddr = defaultItem['address'] as String? ?? '';
+      updatedAddresses[index] = Map<String, dynamic>.from(address);
 
       final updated = _userModel!.copyWith(
         savedAddresses: updatedAddresses,
-        defaultAddress: effectiveAddr.isNotEmpty ? effectiveAddr : null,
       );
       await _firestoreService.saveUser(updated);
       _userModel = updated;
@@ -703,7 +667,51 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Xóa một địa chỉ khỏi Sổ địa chỉ
+  /// Bật/Tắt (Toggle-off) cờ Mặc định 2 chiều cho một địa chỉ trong Sổ địa chỉ
+  Future<bool> toggleSavedAddressDefault(int index) async {
+    if (_userModel == null ||
+        index < 0 ||
+        index >= _userModel!.savedAddresses.length) {
+      return false;
+    }
+    _setLoading(true);
+    _errorMessage = null;
+
+    try {
+      final updatedAddresses =
+          List<Map<String, dynamic>>.from(_userModel!.savedAddresses);
+      final currentItem = updatedAddresses[index];
+      final isCurrentlyDefault = currentItem['isDefault'] == true;
+
+      if (isCurrentlyDefault) {
+        // Đang là mặc định -> Gỡ bỏ về false (để hệ thống quay về dùng Địa chỉ hồ sơ chính)
+        updatedAddresses[index] =
+            Map<String, dynamic>.from(currentItem)..['isDefault'] = false;
+      } else {
+        // Chưa là mặc định -> Gỡ tất cả địa chỉ khác, đặt địa chỉ này làm mặc định
+        for (var i = 0; i < updatedAddresses.length; i++) {
+          updatedAddresses[i] =
+              Map<String, dynamic>.from(updatedAddresses[i])..['isDefault'] = false;
+        }
+        updatedAddresses[index] =
+            Map<String, dynamic>.from(currentItem)..['isDefault'] = true;
+      }
+
+      final updated = _userModel!.copyWith(
+        savedAddresses: updatedAddresses,
+      );
+      await _firestoreService.saveUser(updated);
+      _userModel = updated;
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  /// Xóa một địa chỉ khỏi Sổ địa chỉ (Không tự ý đôn địa chỉ khác làm mặc định)
   Future<bool> deleteSavedAddress(int index) async {
     if (_userModel == null ||
         index < 0 ||
@@ -716,24 +724,10 @@ class AuthProvider extends ChangeNotifier {
     try {
       final updatedAddresses =
           List<Map<String, dynamic>>.from(_userModel!.savedAddresses);
-      final removed = updatedAddresses.removeAt(index);
-
-      // Nếu xóa địa chỉ mặc định và danh sách vẫn còn phần tử, gán phần tử đầu làm mặc định
-      if (removed['isDefault'] == true && updatedAddresses.isNotEmpty) {
-        updatedAddresses[0] =
-            Map<String, dynamic>.from(updatedAddresses[0])..['isDefault'] = true;
-      }
-
-      final newDefaultAddr = updatedAddresses.isNotEmpty
-          ? (updatedAddresses.firstWhere(
-              (a) => a['isDefault'] == true,
-              orElse: () => updatedAddresses.first,
-            )['address'] as String? ?? '')
-          : '';
+      updatedAddresses.removeAt(index);
 
       final updated = _userModel!.copyWith(
         savedAddresses: updatedAddresses,
-        defaultAddress: newDefaultAddr,
       );
       await _firestoreService.saveUser(updated);
       _userModel = updated;

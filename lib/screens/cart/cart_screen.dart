@@ -26,6 +26,19 @@ class _CartScreenState extends State<CartScreen> {
   final _voucherController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final productProvider = context.read<ProductProvider>();
+      final cartProvider = context.read<CartProvider>();
+      if (productProvider.allProducts.isNotEmpty && cartProvider.items.isNotEmpty) {
+        cartProvider.validateAndAlignCart(productProvider.allProducts);
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _voucherController.dispose();
     super.dispose();

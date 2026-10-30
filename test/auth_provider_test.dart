@@ -126,18 +126,20 @@ void main() {
       expect(authProvider.isPasswordProvider, isTrue);
     });
 
-    test('3. Quản lý Sổ địa chỉ (addSavedAddress, updateSavedAddress, deleteSavedAddress)', () async {
+    test('3. Quản lý Sổ địa chỉ (addSavedAddress, updateSavedAddress, toggleSavedAddressDefault, deleteSavedAddress)', () async {
       final initialUser = UserModel(
         uid: 'user_addr_01',
         email: 'addr@fpt.edu.vn',
         fullName: 'Địa Chỉ Test',
+        defaultAddress: 'Số 1 Hồ sơ chính, Hà Nội',
         createdAt: DateTime.now(),
       );
       authProvider.setMockUser(initialUser);
 
-      // Thêm địa chỉ đầu tiên -> Tự động trở thành mặc định
+      // 1. Thêm địa chỉ phụ không chọn mặc định -> isDefault vẫn là false, effectiveDefaultAddress giữ nguyên hồ sơ chính
       final addr1 = {
-        'name': 'Nhà riêng',
+        'label': 'Nhà riêng',
+        'recipientName': 'Người nhận 1',
         'phone': '0901111111',
         'address': 'Khu Công Nghệ Cao Hòa Lạc, Hà Nội',
         'isDefault': false,
@@ -145,12 +147,13 @@ void main() {
       final ok1 = await authProvider.addSavedAddress(addr1);
       expect(ok1, isTrue);
       expect(authProvider.savedAddresses.length, 1);
-      expect(authProvider.savedAddresses[0]['isDefault'], isTrue);
-      expect(authProvider.effectiveDefaultAddress, 'Khu Công Nghệ Cao Hòa Lạc, Hà Nội');
+      expect(authProvider.savedAddresses[0]['isDefault'], isFalse); // Không bị ép buộc làm mặc định
+      expect(authProvider.effectiveDefaultAddress, 'Số 1 Hồ sơ chính, Hà Nội'); // Ưu tiên hồ sơ chính khi sổ không có mặc định
 
-      // Thêm địa chỉ thứ hai đánh dấu isDefault = true -> Địa chỉ đầu tiên bị hạ cờ mặc định
+      // 2. Thêm địa chỉ thứ hai đánh dấu isDefault = true -> Ưu tiên địa chỉ này
       final addr2 = {
-        'name': 'Văn phòng FPT',
+        'label': 'Văn phòng FPT',
+        'recipientName': 'Người nhận 2',
         'phone': '0902222222',
         'address': 'Toà nhà FPT Tân Thuận, Quận 7, TP.HCM',
         'isDefault': true,
@@ -161,10 +164,20 @@ void main() {
       expect(authProvider.savedAddresses[0]['isDefault'], isFalse);
       expect(authProvider.savedAddresses[1]['isDefault'], isTrue);
       expect(authProvider.effectiveDefaultAddress, 'Toà nhà FPT Tân Thuận, Quận 7, TP.HCM');
+      expect(authProvider.effectiveRecipientName, 'Người nhận 2');
+      expect(authProvider.effectivePhone, '0902222222');
 
-      // Cập nhật địa chỉ 0
+      // 3. Toggle-off cờ mặc định của địa chỉ 2 -> Không còn địa chỉ nào mặc định trong sổ -> Quay về hồ sơ chính
+      final okToggle = await authProvider.toggleSavedAddressDefault(1);
+      expect(okToggle, isTrue);
+      expect(authProvider.savedAddresses[1]['isDefault'], isFalse);
+      expect(authProvider.effectiveDefaultAddress, 'Số 1 Hồ sơ chính, Hà Nội');
+      expect(authProvider.effectiveRecipientName, 'Địa Chỉ Test');
+
+      // 4. Cập nhật địa chỉ 0
       final okUpdate = await authProvider.updateSavedAddress(0, {
-        'name': 'Nhà riêng Cũ',
+        'label': 'Nhà riêng Cũ',
+        'recipientName': 'Người nhận 1',
         'phone': '0901111111',
         'address': 'Thạch Thất, Hà Nội',
         'isDefault': false,
@@ -172,12 +185,12 @@ void main() {
       expect(okUpdate, isTrue);
       expect(authProvider.savedAddresses[0]['address'], 'Thạch Thất, Hà Nội');
 
-      // Xóa địa chỉ mặc định (index 1) -> Địa chỉ còn lại (index 0) tự động lên làm mặc định
+      // 5. Xóa địa chỉ (index 1) -> Không tự ý đôn địa chỉ còn lại lên làm mặc định
       final okDelete = await authProvider.deleteSavedAddress(1);
       expect(okDelete, isTrue);
       expect(authProvider.savedAddresses.length, 1);
-      expect(authProvider.savedAddresses[0]['isDefault'], isTrue);
-      expect(authProvider.effectiveDefaultAddress, 'Thạch Thất, Hà Nội');
+      expect(authProvider.savedAddresses[0]['isDefault'], isFalse);
+      expect(authProvider.effectiveDefaultAddress, 'Số 1 Hồ sơ chính, Hà Nội');
     });
 
     test('4. Thêm / Xóa Wishlist (toggleWishlist)', () async {

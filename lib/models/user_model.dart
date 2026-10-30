@@ -42,17 +42,45 @@ class UserModel {
   /// Cân nặng đã lưu (kg)
   double? get savedWeight => bodyMeasurements?['weight']?.toDouble();
 
-  /// Địa chỉ nhận hàng ưu tiên (Lấy từ địa chỉ mặc định trong sổ địa chỉ nếu có, hoặc fallback về defaultAddress)
+  /// Địa chỉ nhận hàng ưu tiên:
+  /// 1. Nếu có địa chỉ trong sổ địa chỉ được người dùng chủ động tick 'isDefault == true' -> Lấy địa chỉ đó.
+  /// 2. Nếu không có địa chỉ nào trong sổ có isDefault == true (hoặc sổ trống) -> Luôn lấy defaultAddress của Hồ sơ chính!
   String get effectiveDefaultAddress {
     if (savedAddresses.isNotEmpty) {
       final defaultItem = savedAddresses.firstWhere(
         (a) => a['isDefault'] == true,
-        orElse: () => savedAddresses.first,
+        orElse: () => const {},
       );
       final addr = defaultItem['address'] as String? ?? '';
       if (addr.isNotEmpty) return addr;
     }
     return defaultAddress;
+  }
+
+  /// Họ tên người nhận ưu tiên (Lấy từ mục mặc định trong sổ địa chỉ nếu có, hoặc fallback về fullName)
+  String get effectiveRecipientName {
+    if (savedAddresses.isNotEmpty) {
+      final defaultItem = savedAddresses.firstWhere(
+        (a) => a['isDefault'] == true,
+        orElse: () => const {},
+      );
+      final name = defaultItem['recipientName'] as String? ?? '';
+      if (name.isNotEmpty) return name;
+    }
+    return fullName;
+  }
+
+  /// Số điện thoại người nhận ưu tiên (Lấy từ mục mặc định trong sổ địa chỉ nếu có, hoặc fallback về phone)
+  String get effectivePhone {
+    if (savedAddresses.isNotEmpty) {
+      final defaultItem = savedAddresses.firstWhere(
+        (a) => a['isDefault'] == true,
+        orElse: () => const {},
+      );
+      final p = defaultItem['phone'] as String? ?? '';
+      if (p.isNotEmpty) return p;
+    }
+    return phone;
   }
 
   factory UserModel.fromMap(Map<String, dynamic> map, [String? id]) {

@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/order_model.dart';
 import '../../providers/auth_provider.dart';
@@ -1380,7 +1381,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
           // NÚT MỞ LẠI MÃ VIETQR (Khóa Bẫy 8 & 16)
           if (canShowVietQrButton) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.amber.shade300),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.timer_outlined, size: 16, color: Colors.amber),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Hạn thanh toán: ${AppConstants.unpaidOrderTimeoutMinutes} phút kể từ khi đặt. Đơn hàng sẽ tự động hủy nếu quá hạn.',
+                      style: TextStyle(fontSize: 11, color: Colors.black87, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               height: 44,
@@ -1392,6 +1414,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       orderId: order.orderId,
                       totalPrice: order.totalPrice,
                       isFromCheckout: false,
+                      createdAt: order.createdAt,
                     ),
                   );
                 },

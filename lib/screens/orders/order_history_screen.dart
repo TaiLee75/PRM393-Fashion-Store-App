@@ -572,6 +572,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                         orderId: order.orderId,
                         totalPrice: order.totalPrice,
                         isFromCheckout: false,
+                        createdAt: order.createdAt,
                       ),
                     );
                   },

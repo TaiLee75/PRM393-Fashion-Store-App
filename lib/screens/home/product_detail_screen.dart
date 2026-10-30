@@ -597,21 +597,49 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         height: 48,
                         child: OutlinedButton.icon(
                           onPressed: () {
-                            final cartItemId = '${product.id}_${_selectedSize}_$_selectedColor';
-                            cartProvider.addItem(CartItemModel(
-                              cartItemId: cartItemId,
-                              productId: product.id,
-                              productName: product.name,
-                              imageUrl: product.mainImage,
-                              price: product.price,
-                              size: _selectedSize,
-                              color: _selectedColor,
-                              quantity: _quantity,
-                            ));
+                            final cartItemId =
+                                '${product.id}_${_selectedSize}_$_selectedColor';
+                            final existingIdx = cartProvider.items
+                                .indexWhere((i) => i.cartItemId == cartItemId);
+                            final currentInCart = existingIdx >= 0
+                                ? cartProvider.items[existingIdx].quantity
+                                : 0;
 
+                            if (currentInCart >= variantStock) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Giỏ hàng đã có $variantStock sản phẩm (tối đa tồn kho của phân loại này)!',
+                                  ),
+                                  backgroundColor: AppColors.black,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                              return;
+                            }
+
+                            cartProvider.addItem(
+                              CartItemModel(
+                                cartItemId: cartItemId,
+                                productId: product.id,
+                                productName: product.name,
+                                imageUrl: product.mainImage,
+                                price: product.price,
+                                size: _selectedSize,
+                                color: _selectedColor,
+                                quantity: _quantity,
+                              ),
+                              variantStock,
+                            );
+
+                            final isMaxed = (currentInCart + _quantity) >= variantStock;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Đã thêm ${product.name} ($_selectedSize, $_selectedColor) x$_quantity vào giỏ!'),
+                                content: Text(
+                                  isMaxed && (currentInCart + _quantity) > variantStock
+                                      ? 'Đã cập nhật số lượng trong giỏ lên tối đa ($variantStock sản phẩm)!'
+                                      : 'Đã thêm ${product.name} ($_selectedSize, $_selectedColor) x$_quantity vào giỏ!',
+                                ),
                                 backgroundColor: AppColors.black,
                                 duration: const Duration(seconds: 2),
                               ),
