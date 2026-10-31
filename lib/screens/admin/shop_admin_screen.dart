@@ -2877,60 +2877,61 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
               ],
             ),
           ),
-          const SizedBox(height: 24),
+                    const SizedBox(height: 20),
 
-          // Switch Role Demo Tool
+          // Thẻ thông tin tài khoản Admin đang hoạt động
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.ultraLightGrey,
+              color: AppColors.white,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: AppColors.border),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                const Row(
-                  children: [
-                    Icon(
-                      Icons.admin_panel_settings_outlined,
-                      color: AppColors.black,
-                      size: 28,
-                    ),
-                    SizedBox(width: 10),
-                    Text(
-                      'Chuyển đổi Vai trò (Role Switcher)',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                const Icon(
+                  Icons.admin_panel_settings,
+                  color: AppColors.primary,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'TÀI KHOẢN QUẢN TRỊ VIÊN',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Vai trò hiện tại: ${authProvider.userRole.toUpperCase()}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
+                      const SizedBox(height: 2),
+                      Text(
+                        authProvider.userEmail,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: () => authProvider.toggleAdminRoleForDemo(),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.black,
-                    side: const BorderSide(color: AppColors.black),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                    ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Text(
-                    authProvider.isAdmin
-                        ? 'Chuyển về Khách Hàng (Customer)'
-                        : 'Chuyển sang Quản Trị Viên (Admin)',
+                  child: const Text(
+                    'ĐÃ XÁC THỰC',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
                   ),
                 ),
               ],

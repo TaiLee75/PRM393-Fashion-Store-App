@@ -83,7 +83,7 @@ void main() {
       expect(find.text('LIÊN HỆ SHOP VỀ ĐƠN HÀNG NÀY'), findsOneWidget);
 
       // Kiểm tra các nút hành động của trạng thái Pending (Khóa Bẫy 20)
-      expect(find.text('Sửa địa chỉ'), findsOneWidget);
+      expect(find.text('Sửa thông tin'), findsOneWidget);
       expect(find.text('Hủy đơn hàng'), findsOneWidget);
     });
 

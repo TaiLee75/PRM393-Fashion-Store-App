@@ -100,8 +100,8 @@ void main() {
       expect(find.text('Đã giao'), findsOneWidget);
       expect(find.text('Đổi / Trả'), findsOneWidget);
 
-      // 4. Kiểm tra Demo Role Switcher
-      expect(find.textContaining('Demo Role Switcher'), findsOneWidget);
+      // 4. Kiểm tra Badge hiển thị vai trò chính thức
+      expect(find.textContaining('KHÁCH HÀNG (CUSTOMER)'), findsOneWidget);
     });
 
     testWidgets('Bấm Đổi mật khẩu tài khoản mở Hộp thoại Re-authentication (Khóa Bẫy 4)',
