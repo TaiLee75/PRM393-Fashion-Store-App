@@ -30,7 +30,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final productProvider = context.watch<ProductProvider>();
     final cartProvider = context.read<CartProvider>();
     final authProvider = context.watch<AuthProvider>();
-
     final ProductModel product = productProvider.allProducts.firstWhere(
       (p) => p.id == widget.productId,
       orElse: () => const ProductModel(
@@ -431,28 +430,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   const Divider(height: 32),
 
-                  // 6. PHẦN ĐÁNH GIÁ (REVIEWS) & NÚT VIẾT ĐÁNH GIÁ
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'ĐÁNH GIÁ TỪ KHÁCH HÀNG (${product.reviews.length})',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: () => _showAddReviewDialog(context, product, authProvider),
-                        icon: const Icon(Icons.rate_review_outlined, size: 16),
-                        label: const Text('Viết đánh giá'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          textStyle: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
+                  // 6. PHẦN ĐÁNH GIÁ (REVIEWS)
+                  Text(
+                    'ĐÁNH GIÁ TỪ KHÁCH HÀNG (${product.reviews.length})',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                   const SizedBox(height: 8),
 
@@ -460,12 +445,33 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Text(
-                        'Chưa có đánh giá nào cho sản phẩm này. Hãy là người đầu tiên trải nghiệm!',
+                        'Chưa có đánh giá nào cho sản phẩm này. Hãy mua sản phẩm và là người đầu tiên trải nghiệm!',
                         style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                       ),
                     )
-                  else
-                    ...product.reviews.map((r) => _buildReviewItem(r)),
+                  else ...[
+                    // Hiển thị tối đa 2 đánh giá mới nhất trên giao diện chính
+                    ...product.reviews.take(2).map((r) => _buildReviewItem(r)),
+                    const SizedBox(height: 8),
+                    // Nút mở modal xem tất cả đánh giá
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showAllReviewsBottomSheet(context, product),
+                        icon: const Icon(Icons.reviews_outlined, size: 16),
+                        label: Text(
+                          'XEM TẤT CẢ (${product.reviews.length}) ĐÁNH GIÁ',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.border),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        ),
+                      ),
+                    ),
+                  ],
 
                   // 7. GỢI Ý SẢN PHẨM TƯƠNG TỰ
                   Builder(
@@ -724,43 +730,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        review.userName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ),
-                    if (review.isVerifiedPurchase) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(3),
-                          border: Border.all(color: AppColors.success, width: 0.6),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.verified, size: 10, color: AppColors.success),
-                            SizedBox(width: 2),
-                            Text(
-                              'Đã mua hàng',
-                              style: TextStyle(
-                                color: AppColors.success,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
+                child: Text(
+                  review.userName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
               const SizedBox(width: 8),
@@ -798,118 +772,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  void _showAddReviewDialog(
-    BuildContext context,
-    ProductModel product,
-    AuthProvider authProvider,
-  ) {
-    if (!authProvider.isAuthenticated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng đăng nhập để viết đánh giá sản phẩm!'),
-          backgroundColor: AppColors.black,
-        ),
-      );
-      return;
-    }
 
-    double selectedRating = 5.0;
-    final commentController = TextEditingController();
 
-    showDialog(
+  void _showAllReviewsBottomSheet(BuildContext context, ProductModel product) {
+    showModalBottomSheet(
       context: context,
-      builder: (dialogCtx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text(
-                'Viết Đánh Giá Sản Phẩm',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      return IconButton(
-                        icon: Icon(
-                          index < selectedRating ? Icons.star : Icons.star_border,
-                          color: AppColors.star,
-                          size: 32,
-                        ),
-                        onPressed: () {
-                          setDialogState(() {
-                            selectedRating = (index + 1).toDouble();
-                          });
-                        },
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: commentController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: 'Nhận xét về chất vải, form áo, độ co giãn...',
-                      hintStyle: const TextStyle(fontSize: 13),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      filled: true,
-                      fillColor: AppColors.ultraLightGrey,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogCtx),
-                  child: const Text('Hủy', style: TextStyle(color: AppColors.grey)),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (commentController.text.trim().isEmpty) return;
-
-                    final messenger = ScaffoldMessenger.of(context);
-                    final navigator = Navigator.of(dialogCtx);
-                    final productProvider = context.read<ProductProvider>();
-                    final success = await productProvider.addReview(
-                      productId: product.id,
-                      userName: authProvider.userFullName,
-                      rating: selectedRating,
-                      comment: commentController.text.trim(),
-                      userId: authProvider.userId,
-                      variantInfo: 'Phân loại: Size $_selectedSize, Màu $_selectedColor',
-                    );
-
-                    navigator.pop();
-                    messenger.showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          success
-                              ? 'Đã gửi đánh giá thành công!'
-                              : 'Gửi đánh giá thất bại',
-                        ),
-                        backgroundColor:
-                            success ? AppColors.success : AppColors.error,
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  child: const Text('Gửi Đánh Giá'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _AllReviewsBottomSheet(product: product),
     );
   }
 
@@ -1309,4 +1179,250 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 }
+
+// ============================================================================
+// DEDICATED REVIEW DIALOG & BOTTOM SHEET
+// ============================================================================
+
+
+
+/// Bottom Sheet hiển thị danh sách toàn bộ đánh giá kèm bộ lọc sao
+class _AllReviewsBottomSheet extends StatefulWidget {
+  final ProductModel product;
+  const _AllReviewsBottomSheet({required this.product});
+
+  @override
+  State<_AllReviewsBottomSheet> createState() => _AllReviewsBottomSheetState();
+}
+
+class _AllReviewsBottomSheetState extends State<_AllReviewsBottomSheet> {
+  int _selectedStarFilter = 0; // 0 = Tất cả, 1-5 = Số sao
+
+  @override
+  Widget build(BuildContext context) {
+    final reviews = widget.product.reviews;
+    final totalCount = reviews.length;
+    final count5 = reviews.where((r) => r.rating >= 4.5).length;
+    final count4 = reviews.where((r) => r.rating >= 3.5 && r.rating < 4.5).length;
+    final count3 = reviews.where((r) => r.rating >= 2.5 && r.rating < 3.5).length;
+    final count2 = reviews.where((r) => r.rating >= 1.5 && r.rating < 2.5).length;
+    final count1 = reviews.where((r) => r.rating < 1.5).length;
+
+    final filteredReviews = _selectedStarFilter == 0
+        ? reviews
+        : reviews.where((r) {
+            if (_selectedStarFilter == 5) return r.rating >= 4.5;
+            if (_selectedStarFilter == 4) return r.rating >= 3.5 && r.rating < 4.5;
+            if (_selectedStarFilter == 3) return r.rating >= 2.5 && r.rating < 3.5;
+            if (_selectedStarFilter == 2) return r.rating >= 1.5 && r.rating < 2.5;
+            if (_selectedStarFilter == 1) return r.rating < 1.5;
+            return true;
+          }).toList();
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        children: [
+          // Drag handle
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'TẤT CẢ ĐÁNH GIÁ ($totalCount)',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.5),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+
+          // Overview Rating Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          widget.product.rating.toStringAsFixed(1),
+                          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        ),
+                        const Text(
+                          ' / 5.0',
+                          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: List.generate(5, (i) {
+                        return Icon(
+                          i < widget.product.rating.round() ? Icons.star : Icons.star_border,
+                          size: 16,
+                          color: AppColors.star,
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                Text(
+                  '$totalCount đánh giá & nhận xét',
+                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+
+          // Star Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              children: [
+                _buildStarChip(label: 'Tất cả ($totalCount)', filterVal: 0),
+                const SizedBox(width: 8),
+                _buildStarChip(label: '5 ★ ($count5)', filterVal: 5),
+                const SizedBox(width: 8),
+                _buildStarChip(label: '4 ★ ($count4)', filterVal: 4),
+                const SizedBox(width: 8),
+                _buildStarChip(label: '3 ★ ($count3)', filterVal: 3),
+                const SizedBox(width: 8),
+                _buildStarChip(label: '2 ★ ($count2)', filterVal: 2),
+                const SizedBox(width: 8),
+                _buildStarChip(label: '1 ★ ($count1)', filterVal: 1),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1),
+
+          // Reviews List
+          Expanded(
+            child: filteredReviews.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.rate_review_outlined, size: 48, color: Colors.grey.shade400),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Chưa có đánh giá nào cho mức ${_selectedStarFilter == 0 ? '' : '$_selectedStarFilter ★'} này',
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filteredReviews.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (ctx, index) {
+                      return _buildReviewCard(filteredReviews[index]);
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStarChip({required String label, required int filterVal}) {
+    final isSelected = _selectedStarFilter == filterVal;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => setState(() => _selectedStarFilter = filterVal),
+      selectedColor: AppColors.primary,
+      backgroundColor: Colors.grey.shade100,
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        color: isSelected ? Colors.white : AppColors.textPrimary,
+      ),
+    );
+  }
+
+  Widget _buildReviewCard(ReviewModel review) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  review.userName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Row(
+                children: List.generate(
+                  5,
+                  (i) => Icon(
+                    i < review.rating ? Icons.star : Icons.star_border,
+                    size: 14,
+                    color: AppColors.star,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (review.variantInfo.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(
+              review.variantInfo,
+              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Text(
+            review.comment,
+            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            AppFormatters.formatRelativeTime(review.createdAt),
+            style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 

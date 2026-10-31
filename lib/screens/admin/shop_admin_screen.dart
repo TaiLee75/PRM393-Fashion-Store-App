@@ -1941,6 +1941,65 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                 ),
               ],
 
+              // 4b. Banner CẦN HOÀN TIỀN (Khách đã thanh toán nhưng đơn bị hủy)
+              if (order.isRefundPending) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.orange.shade400, width: 1.2),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.currency_exchange, size: 18, color: Colors.orange.shade900),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'ĐƠN CẦN HOÀN TIỀN: ${AppFormatters.formatVND(order.totalPrice)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        order.status == OrderModel.statusReturned
+                            ? 'Đơn hàng đổi/trả đã được chấp thuận. Vui lòng chuyển khoản hoàn tiền cho khách, sau đó nhấn xác nhận bên dưới.'
+                            : 'Khách đã thanh toán đơn này trước khi hủy. Vui lòng chuyển khoản lại cho khách, sau đó nhấn xác nhận bên dưới.',
+                        style: TextStyle(fontSize: 11, color: Colors.orange.shade900),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _showConfirmRefundDialog(order, orderProvider),
+                          icon: const Icon(Icons.check_circle_outline, size: 14),
+                          label: const Text('Xác nhận đã chuyển tiền hoàn', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               // 5. Danh sách sản phẩm rút gọn (Item Details Preview)
               if (order.items.isNotEmpty) ...[
                 const SizedBox(height: 10),
@@ -2160,6 +2219,20 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                       ),
                     ),
                   ] else ...[
+                    if (order.isRefundPending) ...[
+                      ElevatedButton.icon(
+                        onPressed: () => _showConfirmRefundDialog(order, orderProvider),
+                        icon: const Icon(Icons.currency_exchange, size: 14),
+                        label: const Text('Xác nhận đã hoàn tiền'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple.shade700,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     TextButton.icon(
                       onPressed: () {
                         Navigator.push(
@@ -2262,6 +2335,11 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
         bg = Colors.amber.shade50;
         fg = Colors.amber.shade800;
         text = 'Chờ đối soát';
+        break;
+      case OrderModel.paymentRefundPending:
+        bg = Colors.orange.shade50;
+        fg = Colors.orange.shade800;
+        text = 'Chờ hoàn tiền';
         break;
       case OrderModel.paymentRefunded:
         bg = Colors.purple.shade50;
@@ -2454,7 +2532,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
     }
   }
 
-  /// Admin duyệt chấp thuận Đổi / Trả hàng: Hoàn kho SKU và hoàn tiền Refunded
+  /// Admin duyệt chấp thuận Đổi / Trả hàng: Hoàn kho SKU và chuyển sang Chờ hoàn tiền (RefundPending)
   Future<void> _showApproveReturnDialog(
     OrderModel order,
     OrderProvider orderProvider,
@@ -2473,7 +2551,9 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
           'Xác nhận duyệt yêu cầu đổi trả cho đơn #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId}?\n\n'
           '• Lý do khách yêu cầu: "${order.returnReason}"\n'
           '• Hệ thống sẽ tự động hoàn lại tồn kho cho tất cả SKU trong đơn.\n'
-          '• Trạng thái thanh toán sẽ chuyển sang "Refunded" (Hoàn tiền).',
+          '• Trạng thái đơn hàng sẽ chuyển sang "Đã hoàn trả".\n'
+          '• Trạng thái thanh toán sẽ chuyển sang "Chờ hoàn tiền" (RefundPending).\n'
+          '• Sau khi chuyển khoản trả tiền cho khách, bạn hãy nhấn nút "Xác nhận đã hoàn tiền".',
           style: const TextStyle(fontSize: 13),
         ),
         actions: [
@@ -2496,7 +2576,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(success
-              ? 'Đã duyệt đổi trả và hoàn kho SKU thành công'
+              ? 'Đã duyệt đổi trả và hoàn kho SKU. Đơn chuyển sang trạng thái Chờ hoàn tiền.'
               : 'Duyệt đổi trả thất bại: ${orderProvider.errorMessage}'),
           backgroundColor: success ? AppColors.success : Colors.red,
         ),
@@ -2643,6 +2723,71 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
               ? 'Đã từ chối giao dịch VietQR'
               : 'Thao tác thất bại: ${orderProvider.errorMessage}'),
           backgroundColor: success ? Colors.orange.shade800 : Colors.red,
+        ),
+      );
+    }
+  }
+
+  /// Admin xác nhận đã hoàn tiền chuyển khoản cho khách hàng
+  Future<void> _showConfirmRefundDialog(
+    OrderModel order,
+    OrderProvider orderProvider,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.currency_exchange, color: Colors.purple),
+            SizedBox(width: 8),
+            Text('Xác nhận hoàn tiền', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Đơn hàng: #${order.orderId.length > 8 ? order.orderId.substring(0, 8).toUpperCase() : order.orderId.toUpperCase()}'),
+            const SizedBox(height: 4),
+            Text('Khách hàng: ${order.userName} - ${order.phone}'),
+            const SizedBox(height: 4),
+            Text(
+              'Số tiền hoàn: ${AppFormatters.formatVND(order.totalPrice)}',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.purple, fontSize: 15),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Bạn đã thực hiện chuyển khoản lại số tiền này cho khách hàng chưa? Thao tác này sẽ cập nhật trạng thái thanh toán sang "Đã hoàn tiền" và gửi thông báo đến tài khoản khách hàng.',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Chưa chuyển'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple.shade700,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Đã chuyển hoàn'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final success = await orderProvider.confirmPaymentRefunded(order.orderId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? 'Đã xác nhận hoàn tiền thành công!' : 'Thao tác thất bại: ${orderProvider.errorMessage}',
+          ),
+          backgroundColor: success ? AppColors.success : Colors.red,
         ),
       );
     }

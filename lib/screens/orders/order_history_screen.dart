@@ -173,7 +173,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                   onRefresh: () async {
                     final auth = Provider.of<AuthProvider?>(context, listen: false);
                     if (auth != null && auth.userId.isNotEmpty) {
-                      context.read<OrderProvider>().listenUserOrders(auth.userId);
+                      context.read<OrderProvider>().listenUserOrders(auth.userId, forceReload: true);
                     }
                   },
                   child: ListView.separated(
@@ -453,13 +453,19 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         order.status == OrderModel.statusReturned;
 
     return InkWell(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => OrderDetailScreen(initialOrder: order),
           ),
         );
+        if (mounted) {
+          final auth = Provider.of<AuthProvider?>(context, listen: false);
+          if (auth != null && auth.userId.isNotEmpty) {
+            context.read<OrderProvider>().listenUserOrders(auth.userId, forceReload: true);
+          }
+        }
       },
       borderRadius: BorderRadius.circular(8),
       child: Container(
@@ -643,6 +649,58 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
 
   /// Badge hiển thị trạng thái dòng tiền minh bạch (Khóa Bẫy 16)
   Widget _buildPaymentBadge(OrderModel order) {
+    if (order.isRefundPending) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.orange.shade400),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.hourglass_bottom, size: 12, color: Colors.orange.shade900),
+            const SizedBox(width: 3),
+            Text(
+              'Chờ hoàn tiền',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.orange.shade900,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (order.isRefunded) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.purple.shade50,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.purple.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.currency_exchange, size: 12, color: Colors.purple.shade800),
+            const SizedBox(width: 3),
+            Text(
+              'Đã hoàn tiền',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.purple.shade800,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (order.isPaymentSubmitted) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -695,33 +753,12 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       );
     }
 
-    if (order.isRefunded) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.purple.shade50,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: Colors.purple.shade300),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.currency_exchange, size: 12, color: Colors.purple.shade800),
-            const SizedBox(width: 3),
-            Text(
-              'Đã hoàn tiền',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Colors.purple.shade800,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     if (order.isVietQr && order.paymentStatus == OrderModel.paymentUnpaid) {
+      // Nếu đơn đã hủy thì không hiển thị badge Chưa thanh toán gây hiểu nhầm
+      if (order.status == OrderModel.statusCancelled) {
+        return const SizedBox.shrink();
+      }
+
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
