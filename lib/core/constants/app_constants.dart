@@ -203,4 +203,14 @@ class AppConstants {
     final accountNameEncoded = Uri.encodeComponent(bankAccountName);
     return 'https://img.vietqr.io/image/$bankId-$bankAccountNo-compact2.png?amount=$cleanAmount&addInfo=$addInfo&accountName=$accountNameEncoded';
   }
+
+  // 5. Cấu hình Tài khoản Phân quyền (Role Management) & Đăng nhập Test
+  static const List<String> adminEmails = [
+    'minhtai130tgm@gmail.com',
+  ];
+
+  static const String demoAdminEmail = 'minhtai130tgm@gmail.com';
+  static const String demoAdminPassword = '123456';
+  static const String demoCustomerEmail = 'brunole7575@gmail.com';
+  static const String demoCustomerPassword = '123456';
 }

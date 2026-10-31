@@ -200,34 +200,21 @@ class _MainNavScreenState extends State<MainNavScreen> {
             ],
           ),
 
-          // 3. Nút mở nhanh Shop Admin Screen (Dành cho Demo)
-          IconButton(
-            icon: Icon(
-              Icons.admin_panel_settings,
-              color: isAdmin ? AppColors.primary : AppColors.grey,
-            ),
-            tooltip: isAdmin
-                ? 'Shop Admin Tool (Dành cho Admin)'
-                : 'Chế độ Khách hàng (Vào Tài khoản để bật Admin)',
-            onPressed: () {
-              if (!isAdmin) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'ℹ️ Bạn đang ở chế độ Khách hàng. Hãy vào tab "Tài khoản" và chạm vào huy hiệu để chuyển sang Quản trị viên.',
-                    ),
-                    backgroundColor: AppColors.black,
-                    duration: Duration(seconds: 3),
-                  ),
+          // 3. Nút mở Shop Admin (Chỉ hiển thị khi tài khoản là Admin)
+          if (isAdmin)
+            IconButton(
+              icon: const Icon(
+                Icons.admin_panel_settings,
+                color: AppColors.primary,
+              ),
+              tooltip: 'Shop Admin Tool (Dành cho Quản trị viên)',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ShopAdminScreen()),
                 );
-                return;
-              }
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ShopAdminScreen()),
-              );
-            },
-          ),
+              },
+            ),
           const SizedBox(width: 4),
         ],
       ),

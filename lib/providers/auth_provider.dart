@@ -6,6 +6,7 @@ import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../core/utils/app_validators.dart';
+import '../core/constants/app_constants.dart';
 
 /// ViewModel quản lý trạng thái xác thực và hồ sơ người dùng (MVVM)
 class AuthProvider extends ChangeNotifier {
@@ -95,11 +96,20 @@ class AuthProvider extends ChangeNotifier {
 
   /// Nạp hồ sơ người dùng từ Firestore kèm cơ chế tự động khởi tạo & làm giàu dữ liệu an toàn (Khóa Bẫy 4 & 15)
   Future<void> _fetchUserProfile(String uid) async {
+    final userEmail = (_firebaseUser?.email ?? '').trim().toLowerCase();
+    final isConfiguredAdmin = AppConstants.adminEmails.contains(userEmail);
+
     try {
       final profile = await _firestoreService.getUser(uid);
       if (profile != null) {
         UserModel merged = profile;
         bool needUpdate = false;
+
+        // Tự động đồng bộ quyền admin nếu email nằm trong danh sách admin được chỉ định
+        if (isConfiguredAdmin && merged.role != 'admin') {
+          merged = merged.copyWith(role: 'admin');
+          needUpdate = true;
+        }
 
         // Tự động làm giàu avatar từ Firebase Auth / Google nếu profile Firestore chưa có
         if (merged.avatarUrl.isEmpty &&
@@ -127,9 +137,9 @@ class AuthProvider extends ChangeNotifier {
           email: _firebaseUser?.email ?? '',
           fullName: _firebaseUser?.displayName?.trim().isNotEmpty == true
               ? _firebaseUser!.displayName!.trim()
-              : 'Khách hàng',
+              : (isConfiguredAdmin ? 'Quản trị viên' : 'Khách hàng'),
           avatarUrl: _firebaseUser?.photoURL ?? '',
-          role: 'customer',
+          role: isConfiguredAdmin ? 'admin' : 'customer',
           createdAt: DateTime.now(),
         );
         await _firestoreService.saveUser(newProfile);
@@ -140,9 +150,9 @@ class AuthProvider extends ChangeNotifier {
       _userModel ??= UserModel(
         uid: uid,
         email: _firebaseUser?.email ?? '',
-        fullName: _firebaseUser?.displayName ?? 'Khách hàng',
+        fullName: _firebaseUser?.displayName ?? (isConfiguredAdmin ? 'Quản trị viên' : 'Khách hàng'),
         avatarUrl: _firebaseUser?.photoURL ?? '',
-        role: 'customer',
+        role: isConfiguredAdmin ? 'admin' : 'customer',
         createdAt: DateTime.now(),
       );
     }
@@ -215,12 +225,14 @@ class AuthProvider extends ChangeNotifier {
 
       // Đã xác thực thành công -> Lưu hồ sơ Firestore chính thức
       final cleanPhone = AppValidators.normalizePhone(phone);
+      final isConfiguredAdmin =
+          AppConstants.adminEmails.contains(email.trim().toLowerCase());
       final newProfile = UserModel(
         uid: credential.user!.uid,
         email: email.trim(),
         fullName: fullName.trim(),
         phone: cleanPhone,
-        role: 'customer',
+        role: isConfiguredAdmin ? 'admin' : 'customer',
         createdAt: DateTime.now(),
       );
       await _firestoreService.saveUser(newProfile);

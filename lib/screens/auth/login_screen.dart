@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
 import '../main_nav_screen.dart';
@@ -420,6 +421,121 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Khối điền nhanh tài khoản thử nghiệm dành cho Tester & Giảng viên
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.ultraLightGrey,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.touch_app_outlined,
+                              size: 16,
+                              color: AppColors.textSecondary,
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'ĐIỀN NHANH ĐỂ TEST (1 CHẠM)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.8,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  _emailController.text =
+                                      AppConstants.demoAdminEmail;
+                                  _passwordController.text =
+                                      AppConstants.demoAdminPassword;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          '👑 Đã điền tài khoản Quản trị viên (Admin)'),
+                                      duration: Duration(milliseconds: 1500),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.admin_panel_settings,
+                                    size: 16, color: AppColors.primary),
+                                label: const Text(
+                                  '👑 Admin',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 10, horizontal: 8),
+                                  side: const BorderSide(
+                                      color: AppColors.primary, width: 1.2),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  _emailController.text =
+                                      AppConstants.demoCustomerEmail;
+                                  _passwordController.text =
+                                      AppConstants.demoCustomerPassword;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          '👤 Đã điền tài khoản Khách hàng thử nghiệm'),
+                                      duration: Duration(milliseconds: 1500),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.person,
+                                    size: 16, color: AppColors.darkGrey),
+                                label: const Text(
+                                  '👤 Khách hàng',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 10, horizontal: 8),
+                                  side: const BorderSide(
+                                      color: AppColors.border, width: 1.2),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
