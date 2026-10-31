@@ -87,6 +87,16 @@ class FakeFirestoreServiceForOrderApproval extends FirestoreService {
     if (idx != -1) {
       ordersDb[idx] = ordersDb[idx].copyWith(
         status: OrderModel.statusReturned,
+        paymentStatus: OrderModel.paymentRefundPending,
+      );
+    }
+  }
+
+  @override
+  Future<void> confirmPaymentRefunded(String orderId) async {
+    final idx = ordersDb.indexWhere((o) => o.orderId == orderId);
+    if (idx != -1) {
+      ordersDb[idx] = ordersDb[idx].copyWith(
         paymentStatus: OrderModel.paymentRefunded,
       );
     }
@@ -522,10 +532,24 @@ void main() {
       await tester.tap(find.text('Xác nhận duyệt'));
       await tester.pumpAndSettle();
 
-      // Trạng thái đơn chuyển sang Returned và Refunded
+      // Trạng thái đơn chuyển sang Returned và RefundPending (Bước 1: Chờ hoàn tiền)
       expect(orderProvider.allOrders.first.status, OrderModel.statusReturned);
-      expect(orderProvider.allOrders.first.paymentStatus, OrderModel.paymentRefunded);
+      expect(orderProvider.allOrders.first.paymentStatus, OrderModel.paymentRefundPending);
       expect(find.text('Đã hoàn trả'), findsOneWidget);
+      expect(find.text('Chờ hoàn tiền'), findsOneWidget);
+      expect(find.text('Xác nhận đã chuyển tiền hoàn'), findsOneWidget);
+
+      // Admin bấm nút "Xác nhận đã chuyển tiền hoàn" (Bước 2: Hoàn tiền hoàn tất)
+      await tester.tap(find.text('Xác nhận đã chuyển tiền hoàn'));
+      await tester.pumpAndSettle();
+
+      // Dialog xác nhận hoàn tiền
+      expect(find.text('Xác nhận hoàn tiền'), findsOneWidget);
+      await tester.tap(find.text('Đã chuyển hoàn'));
+      await tester.pumpAndSettle();
+
+      // Trạng thái đơn cập nhật sang Refunded
+      expect(orderProvider.allOrders.first.paymentStatus, OrderModel.paymentRefunded);
       expect(find.text('Đã hoàn tiền'), findsOneWidget);
     });
 

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Model đánh giá sản phẩm từ người mua (Review)
 class ReviewModel {
+  final String id;
   final String userId;
   final String userName;
   final double rating;
@@ -12,6 +13,7 @@ class ReviewModel {
   final bool isVerifiedPurchase;
 
   const ReviewModel({
+    this.id = '',
     this.userId = '',
     required this.userName,
     required this.rating,
@@ -31,6 +33,7 @@ class ReviewModel {
     }
 
     return ReviewModel(
+      id: map['id'] as String? ?? '',
       userId: map['userId'] as String? ?? '',
       userName: map['userName'] as String? ?? 'Khách hàng',
       rating: (map['rating'] as num?)?.toDouble() ?? 5.0,
@@ -44,6 +47,7 @@ class ReviewModel {
 
   Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'userId': userId,
       'userName': userName,
       'rating': rating,
@@ -56,6 +60,7 @@ class ReviewModel {
   }
 
   ReviewModel copyWith({
+    String? id,
     String? userId,
     String? userName,
     double? rating,
@@ -66,6 +71,7 @@ class ReviewModel {
     bool? isVerifiedPurchase,
   }) {
     return ReviewModel(
+      id: id ?? this.id,
       userId: userId ?? this.userId,
       userName: userName ?? this.userName,
       rating: rating ?? this.rating,

@@ -361,7 +361,7 @@ void main() {
       expect(find.textContaining('(M - Trắng)'), findsOneWidget);
     });
 
-    testWidgets('9. Đánh giá sản phẩm hiển thị Badge Đã mua hàng', (tester) async {
+    testWidgets('9. Đánh giá sản phẩm hiển thị thông tin đánh giá (bỏ nút viết và badge Đã mua hàng thừa)', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -388,7 +388,8 @@ void main() {
 
       // Kiểm tra review của người mua
       expect(find.text('Nguyễn Văn A'), findsOneWidget);
-      expect(find.text('Đã mua hàng'), findsOneWidget);
+      expect(find.text('Đã mua hàng'), findsNothing);
+      expect(find.text('Viết đánh giá'), findsNothing);
       expect(find.text('Phân loại: Size M, Màu Trắng'), findsOneWidget);
     });
   });

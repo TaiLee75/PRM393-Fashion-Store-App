@@ -16,6 +16,7 @@ class OrderModel {
   static const String paymentUnpaid = 'Unpaid';
   static const String paymentSubmitted = 'PaymentSubmitted';
   static const String paymentPaid = 'Paid';
+  static const String paymentRefundPending = 'RefundPending';
   static const String paymentRefunded = 'Refunded';
 
   // Constants hình thức nhận hàng
@@ -102,6 +103,9 @@ class OrderModel {
 
   /// Đơn hàng đã được hoàn tiền
   bool get isRefunded => paymentStatus == paymentRefunded;
+
+  /// Đơn hàng đã hủy và đang chờ Shop chuyển khoản hoàn tiền
+  bool get isRefundPending => paymentStatus == paymentRefundPending;
 
   /// Khách hàng đã gửi chuyển khoản VietQR và đang chờ Admin đối soát
   bool get isPaymentSubmitted => paymentStatus == paymentSubmitted;
@@ -197,6 +201,8 @@ class OrderModel {
         return 'Đã chuyển khoản (Chờ duyệt)';
       case paymentPaid:
         return 'Đã thanh toán';
+      case paymentRefundPending:
+        return 'Chờ hoàn tiền';
       case paymentRefunded:
         return 'Đã hoàn tiền';
       default:

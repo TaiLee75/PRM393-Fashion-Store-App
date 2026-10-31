@@ -307,24 +307,32 @@ class FirestoreService {
       final List<dynamic> currentReviews =
           List.from(data['reviews'] as List<dynamic>? ?? []);
 
-      // Tìm xem người dùng đã đánh giá cho đơn hàng/sản phẩm này chưa để cập nhật (Upsert)
+      // Tạo review có ID duy nhất nếu chưa có
+      final reviewId = review.id.isNotEmpty
+          ? review.id
+          : '${review.userId}_${DateTime.now().millisecondsSinceEpoch}';
+      final reviewToSave = review.copyWith(id: reviewId);
+
+      // Tìm xem người dùng đã đánh giá cho đơn hàng cụ thể này chưa (Upsert theo orderId nếu có)
       final existingIndex = currentReviews.indexWhere((r) {
         if (r is Map) {
+          final rId = r['id'] as String? ?? '';
           final uId = r['userId'] as String? ?? '';
           final oId = r['orderId'] as String? ?? '';
-          if (review.orderId.isNotEmpty) {
-            return uId == review.userId && oId == review.orderId;
-          } else if (review.userId.isNotEmpty) {
-            return uId == review.userId;
+          if (rId.isNotEmpty && rId == reviewToSave.id) {
+            return true;
+          }
+          if (reviewToSave.orderId.isNotEmpty && oId.isNotEmpty) {
+            return uId == reviewToSave.userId && oId == reviewToSave.orderId;
           }
         }
         return false;
       });
 
       if (existingIndex >= 0) {
-        currentReviews[existingIndex] = review.toMap();
+        currentReviews[existingIndex] = reviewToSave.toMap();
       } else {
-        currentReviews.add(review.toMap());
+        currentReviews.add(reviewToSave.toMap());
       }
 
       // Tính điểm rating trung bình mới
@@ -591,6 +599,7 @@ class FirestoreService {
   }) async {
     final orderDocRef = _firestore.collection(colOrders).doc(orderId);
     String customerUserId = '';
+    String finalPaymentStatus = '';
 
     await _firestore.runTransaction((transaction) async {
       final orderSnapshot = await transaction.get(orderDocRef);
@@ -678,9 +687,14 @@ class FirestoreService {
       final currentPaymentStatus =
           orderData['paymentStatus'] as String? ?? OrderModel.paymentUnpaid;
       final newPaymentStatus = (currentPaymentStatus == OrderModel.paymentPaid ||
-              currentPaymentStatus == OrderModel.paymentSubmitted)
-          ? OrderModel.paymentRefunded
-          : OrderModel.paymentUnpaid;
+              currentPaymentStatus == OrderModel.paymentSubmitted ||
+              currentPaymentStatus == OrderModel.paymentRefundPending)
+          ? OrderModel.paymentRefundPending
+          : (currentPaymentStatus == OrderModel.paymentRefunded
+              ? OrderModel.paymentRefunded
+              : OrderModel.paymentUnpaid);
+
+      finalPaymentStatus = newPaymentStatus;
 
       // Cập nhật trạng thái đơn hàng
       transaction.update(orderDocRef, {
@@ -694,12 +708,14 @@ class FirestoreService {
     });
 
     if (customerUserId.isNotEmpty) {
+      final isRefundPending = finalPaymentStatus == OrderModel.paymentRefundPending;
       await createNotification(NotificationModel(
         id: '',
         userId: customerUserId,
-        title: 'Đơn hàng đã hủy ❌',
-        body:
-            'Đơn hàng #${orderId.substring(0, min(8, orderId.length))} đã được hủy thành công.',
+        title: isRefundPending ? 'Đơn hàng đã hủy (Chờ hoàn tiền) ⏳' : 'Đơn hàng đã hủy ❌',
+        body: isRefundPending
+            ? 'Đơn hàng #${orderId.substring(0, min(8, orderId.length))} đã được hủy. Shop đã tiếp nhận và đang xử lý chuyển khoản hoàn tiền cho bạn.'
+            : 'Đơn hàng #${orderId.substring(0, min(8, orderId.length))} đã được hủy thành công.',
         orderId: orderId,
         type: NotificationModel.typeOrderUpdate,
         createdAt: DateTime.now(),
@@ -710,15 +726,33 @@ class FirestoreService {
   /// Khách hàng gửi yêu cầu Đổi/Trả hàng (Khi đơn đã giao thành công Delivered)
   Future<void> requestReturnOrder(String orderId,
       {required String returnReason}) async {
-    await _firestore.collection(colOrders).doc(orderId).update({
+    final docRef = _firestore.collection(colOrders).doc(orderId);
+    final doc = await docRef.get();
+    final customerUserId = doc.data()?['userId'] as String? ?? '';
+
+    await docRef.update({
       'status': OrderModel.statusReturnRequested,
       'returnReason': returnReason,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    if (customerUserId.isNotEmpty) {
+      await createNotification(NotificationModel(
+        id: '',
+        userId: customerUserId,
+        title: 'Yêu cầu đổi/trả hàng 📦',
+        body:
+            'Yêu cầu đổi/trả đơn hàng #${orderId.substring(0, min(8, orderId.length))} đã được gửi đến Shop và đang chờ xét duyệt.',
+        orderId: orderId,
+        type: NotificationModel.typeOrderUpdate,
+        createdAt: DateTime.now(),
+      ));
+    }
   }
 
   /// Admin chấp thuận Đổi/Trả hàng trong Transaction (Khóa Bẫy 5, 20, 21):
-  /// - Hoàn lại tồn kho SKU, tự động chuyển paymentStatus sang Refunded.
+  /// - Hoàn lại tồn kho SKU, chuyển paymentStatus sang RefundPending (Chờ hoàn tiền).
+  /// - Admin sẽ bấm "Xác nhận đã hoàn tiền" sau khi hoàn tất chuyển khoản trả tiền cho khách.
   Future<void> approveReturnOrder(String orderId) async {
     final orderDocRef = _firestore.collection(colOrders).doc(orderId);
     String customerUserId = '';
@@ -800,10 +834,10 @@ class FirestoreService {
         });
       }
 
-      // Cập nhật trạng thái hoàn tiền và hoàn đơn
+      // Cập nhật trạng thái hoàn tiền và hoàn đơn (Bước 1: Chuyển sang RefundPending)
       transaction.update(orderDocRef, {
         'status': OrderModel.statusReturned,
-        'paymentStatus': OrderModel.paymentRefunded,
+        'paymentStatus': OrderModel.paymentRefundPending,
         'returnedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -813,9 +847,9 @@ class FirestoreService {
       await createNotification(NotificationModel(
         id: '',
         userId: customerUserId,
-        title: 'Đổi/Trả hàng thành công 🔄',
+        title: 'Yêu cầu đổi/trả được chấp thuận 🔄',
         body:
-            'Yêu cầu hoàn trả đơn hàng #${orderId.substring(0, min(8, orderId.length))} đã được duyệt và xử lý hoàn tiền.',
+            'Shop đã chấp thuận yêu cầu hoàn trả đơn hàng #${orderId.substring(0, min(8, orderId.length))}. Hệ thống đang xử lý chuyển khoản hoàn tiền cho bạn.',
         orderId: orderId,
         type: NotificationModel.typeOrderUpdate,
         createdAt: DateTime.now(),
@@ -1023,6 +1057,32 @@ class FirestoreService {
         title: 'Chưa nhận được thanh toán ⚠️',
         body: reason ??
             'Shop chưa nhận được thanh toán cho đơn #${orderId.substring(0, min(8, orderId.length))}. Vui lòng kiểm tra lại.',
+        orderId: orderId,
+        type: NotificationModel.typeOrderUpdate,
+        createdAt: DateTime.now(),
+      ));
+    }
+  }
+
+  /// Admin xác nhận đã chuyển khoản hoàn tiền cho khách (Cách 1)
+  Future<void> confirmPaymentRefunded(String orderId) async {
+    final orderDocRef = _firestore.collection(colOrders).doc(orderId);
+    final doc = await orderDocRef.get();
+    if (!doc.exists) return;
+    final customerUserId = doc.data()?['userId'] as String? ?? '';
+
+    await orderDocRef.update({
+      'paymentStatus': OrderModel.paymentRefunded,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    if (customerUserId.isNotEmpty) {
+      await createNotification(NotificationModel(
+        id: '',
+        userId: customerUserId,
+        title: 'Hoàn tiền thành công! 💸',
+        body:
+            'Shop đã hoàn tất chuyển khoản hoàn tiền cho đơn hàng #${orderId.substring(0, min(8, orderId.length))}. Quý khách vui lòng kiểm tra tài khoản ngân hàng.',
         orderId: orderId,
         type: NotificationModel.typeOrderUpdate,
         createdAt: DateTime.now(),

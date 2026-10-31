@@ -307,7 +307,9 @@ class ProductProvider extends ChangeNotifier {
     String? variantInfo,
   }) async {
     try {
+      final reviewId = '${userId ?? "guest"}_${DateTime.now().millisecondsSinceEpoch}';
       final review = ReviewModel(
+        id: reviewId,
         userName: userName,
         rating: rating,
         comment: comment,
@@ -324,7 +326,20 @@ class ProductProvider extends ChangeNotifier {
       final index = _products.indexWhere((p) => p.id == productId);
       if (index >= 0) {
         final current = _products[index];
-        final updatedReviews = List<ReviewModel>.from(current.reviews)..add(review);
+        final updatedReviews = List<ReviewModel>.from(current.reviews);
+        final existingIdx = updatedReviews.indexWhere((r) =>
+            (r.id.isNotEmpty && r.id == review.id) ||
+            (review.orderId.isNotEmpty &&
+                r.orderId.isNotEmpty &&
+                r.orderId == review.orderId &&
+                r.userId == review.userId));
+
+        if (existingIdx >= 0) {
+          updatedReviews[existingIdx] = review;
+        } else {
+          updatedReviews.insert(0, review);
+        }
+
         double totalRating = 0;
         for (var r in updatedReviews) {
           totalRating += r.rating;

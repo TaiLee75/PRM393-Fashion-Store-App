@@ -33,10 +33,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
     });
   }
 
-  void _handleNotificationTap(
+  Future<void> _handleNotificationTap(
     NotificationModel noti,
     NotificationProvider notiProvider,
-  ) {
+  ) async {
     if (!noti.isRead) {
       notiProvider.markAsRead(noti.id);
     }
@@ -60,6 +60,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           }
         }
       }
+      matchedOrder ??= await orderProvider.fetchOrderById(noti.orderId!);
     }
 
     // 2. Tra cứu dự phòng theo chuỗi ID trong body/title

@@ -197,8 +197,19 @@ class FakeFirestoreServiceForOrder extends FirestoreService {
 
     ordersDb[orderId] = order.copyWith(
       status: OrderModel.statusReturned,
-      paymentStatus: OrderModel.paymentRefunded,
+      paymentStatus: OrderModel.paymentRefundPending,
       returnedAt: DateTime.now(),
+    );
+    _notifyStreams(order.userId);
+  }
+
+  @override
+  Future<void> confirmPaymentRefunded(String orderId) async {
+    final order = ordersDb[orderId];
+    if (order == null) throw Exception('Đơn hàng không tồn tại.');
+
+    ordersDb[orderId] = order.copyWith(
+      paymentStatus: OrderModel.paymentRefunded,
     );
     _notifyStreams(order.userId);
   }
@@ -616,10 +627,15 @@ void main() {
 
       final returnedOrder = fakeService.ordersDb[orderId]!;
       expect(returnedOrder.status, OrderModel.statusReturned);
-      expect(returnedOrder.paymentStatus, OrderModel.paymentRefunded);
+      expect(returnedOrder.paymentStatus, OrderModel.paymentRefundPending);
 
       // Kho được hoàn lại 8 + 2 = 10
       expect(fakeService.productsDb['prod_001']!.stock, 10);
+
+      // 4. Admin xác nhận đã chuyển khoản hoàn tiền cho khách (confirmPaymentRefunded)
+      final refundOk = await orderProvider.confirmPaymentRefunded(orderId);
+      expect(refundOk, isTrue);
+      expect(fakeService.ordersDb[orderId]!.paymentStatus, OrderModel.paymentRefunded);
     });
 
     test('12. Chu trình đối soát thanh toán VietQR Napas247', () async {
