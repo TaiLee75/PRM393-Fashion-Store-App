@@ -558,9 +558,13 @@ class _CartScreenState extends State<CartScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          'Size: ${item.size}  |  Màu: ${item.color}',
-                          style: const TextStyle(fontSize: 11, color: AppColors.textPrimary),
+                        Flexible(
+                          child: Text(
+                            'Size: ${item.size}  |  Màu: ${item.color}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11, color: AppColors.textPrimary),
+                          ),
                         ),
                         const SizedBox(width: 4),
                         const Icon(Icons.arrow_drop_down, size: 14, color: AppColors.textSecondary),

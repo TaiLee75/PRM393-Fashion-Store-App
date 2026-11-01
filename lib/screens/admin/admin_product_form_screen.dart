@@ -1,7 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/app_image.dart';
 import '../../core/utils/app_validators.dart';
 import '../../models/product_model.dart';
 import '../../providers/product_provider.dart';
@@ -117,6 +119,43 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
       ctrl.dispose();
     }
     super.dispose();
+  }
+
+  /// Chọn ảnh từ máy (Gallery) và nén thành chuỗi Base64 Data URI
+  Future<void> _pickImageForController(TextEditingController controller) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 500,
+        maxHeight: 500,
+        imageQuality: 70, // Nén ảnh chất lượng 70% tối ưu dung lượng < 35KB
+      );
+      if (picked != null) {
+        final bytes = await picked.readAsBytes();
+        final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        setState(() {
+          controller.text = base64String;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Đã tải ảnh từ thiết bị và nén tối ưu!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể chọn ảnh: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   void _showAddCustomSizeDialog() {
@@ -528,8 +567,8 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
 
             const SizedBox(height: 20),
 
-            // 2. HÌNH ẢNH SẢN PHẨM (Unsplash URL)
-            _buildSectionHeader('2. Hình ảnh sản phẩm (Public URLs)'),
+            // 2. HÌNH ẢNH SẢN PHẨM (Public URL hoặc Tải từ thiết bị)
+            _buildSectionHeader('2. Hình ảnh sản phẩm (URL hoặc Tải từ thiết bị)'),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(16),
@@ -544,18 +583,43 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                   TextFormField(
                     controller: _imageUrlController,
                     decoration: InputDecoration(
-                      labelText: 'Đường dẫn ảnh chính (URL) *',
-                      hintText: 'https://images.unsplash.com/...',
+                      labelText: 'Đường dẫn ảnh chính (URL hoặc Base64) *',
+                      hintText: 'https://... hoặc chọn ảnh từ máy',
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.image_outlined),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.refresh),
-                        tooltip: 'Tải lại xem trước',
-                        onPressed: () => setState(() {}),
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+                            tooltip: 'Tải ảnh từ máy',
+                            onPressed: () => _pickImageForController(_imageUrlController),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.refresh),
+                            tooltip: 'Tải lại xem trước',
+                            onPressed: () => setState(() {}),
+                          ),
+                        ],
                       ),
                     ),
                     validator: AppValidators.validateUrl,
                     onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _pickImageForController(_imageUrlController),
+                        icon: const Icon(Icons.upload_file, size: 16),
+                        label: const Text('Tải ảnh chính từ máy', style: TextStyle(fontSize: 12)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        ),
+                      ),
+                    ],
                   ),
 
                   // Các ảnh phụ
@@ -570,19 +634,22 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                               child: TextFormField(
                                 controller: _additionalImageControllers[idx],
                                 decoration: InputDecoration(
-                                  labelText: 'Đường dẫn ảnh phụ ${idx + 1}',
-                                  hintText: 'https://images.unsplash.com/...',
+                                  labelText: 'Ảnh phụ ${idx + 1} (URL / Base64)',
+                                  hintText: 'https://... hoặc chọn từ máy',
                                   border: const OutlineInputBorder(),
-                                  prefixIcon:
-                                      const Icon(Icons.add_photo_alternate_outlined),
+                                  prefixIcon: const Icon(Icons.add_photo_alternate_outlined),
+                                  suffixIcon: IconButton(
+                                    icon: const Icon(Icons.photo_library_outlined, color: AppColors.primary, size: 20),
+                                    tooltip: 'Tải ảnh từ máy',
+                                    onPressed: () => _pickImageForController(_additionalImageControllers[idx]),
+                                  ),
                                   isDense: true,
                                 ),
                                 onChanged: (_) => setState(() {}),
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.remove_circle_outline,
-                                  color: AppColors.error),
+                              icon: const Icon(Icons.remove_circle_outline, color: AppColors.error),
                               tooltip: 'Xóa ảnh này',
                               onPressed: () {
                                 setState(() {
@@ -598,14 +665,30 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                   ],
 
                   const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _additionalImageControllers.add(TextEditingController());
-                      });
-                    },
-                    icon: const Icon(Icons.add_link, size: 18),
-                    label: const Text('+ Thêm link ảnh phụ'),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _additionalImageControllers.add(TextEditingController());
+                          });
+                        },
+                        icon: const Icon(Icons.add_link, size: 18),
+                        label: const Text('+ Thêm link ảnh phụ'),
+                      ),
+                      TextButton.icon(
+                        onPressed: () async {
+                          final ctrl = TextEditingController();
+                          setState(() {
+                            _additionalImageControllers.add(ctrl);
+                          });
+                          await _pickImageForController(ctrl);
+                        },
+                        icon: const Icon(Icons.add_photo_alternate, size: 18),
+                        label: const Text('+ Tải ảnh phụ từ máy'),
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 14),
@@ -625,29 +708,15 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: _imageUrlController.text.trim().isNotEmpty
-                          ? CachedNetworkImage(
+                          ? AppImage(
                               imageUrl: _imageUrlController.text.trim(),
+                              width: double.infinity,
+                              height: 180,
                               fit: BoxFit.cover,
-                              placeholder: (_, __) => const Center(
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                              errorWidget: (_, __, ___) => const Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.broken_image,
-                                        size: 40, color: Colors.grey),
-                                    SizedBox(height: 6),
-                                    Text('URL ảnh không hợp lệ hoặc bị lỗi',
-                                        style: TextStyle(
-                                            fontSize: 12, color: Colors.grey)),
-                                  ],
-                                ),
-                              ),
                             )
                           : const Center(
                               child: Text(
-                                'Dán link ảnh để xem trước',
+                                'Dán link hoặc tải ảnh từ máy để xem trước',
                                 style: TextStyle(color: Colors.grey),
                               ),
                             ),

@@ -928,36 +928,56 @@ class FirestoreService {
     required String status,
     String? userId,
   }) async {
+    final docRef = _firestore.collection(colOrders).doc(orderId);
+
+    String targetUserId = userId ?? '';
+    bool isPickup = false;
+    String branchName = '';
+
+    try {
+      final doc = await docRef.get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        if (targetUserId.isEmpty) {
+          targetUserId = data['userId'] as String? ?? '';
+        }
+        isPickup = (data['deliveryMethod'] as String? ?? '') == OrderModel.deliveryMethodPickup;
+        branchName = data['pickupBranchName'] as String? ?? '';
+      }
+    } catch (_) {}
+
     final Map<String, dynamic> updateData = {
       'status': status,
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
+    final displayId = orderId.length > 8 ? orderId.substring(0, 8).toUpperCase() : orderId.toUpperCase();
     String title = 'Cập nhật đơn hàng';
-    String body = 'Đơn hàng #$orderId hiện đang ở trạng thái: $status.';
+    String body = 'Đơn hàng #$displayId hiện đang ở trạng thái: $status.';
 
     if (status == OrderModel.statusDelivering) {
-      title = 'Đơn hàng đang được giao 🚚';
-      body = 'Đơn hàng #$orderId đang trên đường giao đến bạn.';
+      if (isPickup) {
+        title = 'Đơn hàng đã sẵn sàng nhận 🛍️';
+        body = 'Đơn hàng #$displayId đã được chuẩn bị xong tại ${branchName.isNotEmpty ? branchName : "cửa hàng"}. Mời bạn ghé lấy nhé!';
+      } else {
+        title = 'Đơn hàng đang được giao 🚚';
+        body = 'Đơn hàng #$orderId đang trên đường giao đến bạn.';
+      }
       updateData['deliveringAt'] = FieldValue.serverTimestamp();
     } else if (status == OrderModel.statusDelivered) {
-      title = 'Giao hàng thành công 🎉';
-      body = 'Đơn hàng #$orderId đã được giao thành công. Cảm ơn bạn!';
+      if (isPickup) {
+        title = 'Đã nhận hàng thành công 🎉';
+        body = 'Đơn hàng #$displayId đã được bạn nhận tại cửa hàng. Cảm ơn bạn đã mua sắm!';
+      } else {
+        title = 'Giao hàng thành công 🎉';
+        body = 'Đơn hàng #$orderId đã được giao thành công. Cảm ơn bạn!';
+      }
       updateData['deliveredAt'] = FieldValue.serverTimestamp();
       // Khóa Bẫy 20: Giao COD thành công coi như đã thu tiền mặt -> Paid
       updateData['paymentStatus'] = OrderModel.paymentPaid;
     }
 
-    final docRef = _firestore.collection(colOrders).doc(orderId);
     await docRef.update(updateData);
-
-    String targetUserId = userId ?? '';
-    if (targetUserId.isEmpty) {
-      try {
-        final doc = await docRef.get();
-        targetUserId = doc.data()?['userId'] as String? ?? '';
-      } catch (_) {}
-    }
 
     if (targetUserId.isNotEmpty) {
       await createNotification(NotificationModel(

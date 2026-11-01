@@ -1,7 +1,7 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/app_image.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/category_model.dart';
 import '../../models/product_model.dart';
@@ -26,7 +26,75 @@ class _AdminProductListScreenState extends State<AdminProductListScreen> {
     super.dispose();
   }
 
+  Future<void> _toggleProductStatus(BuildContext context, ProductModel product) async {
+    final newStatus = !product.isActive;
+    final productProvider = context.read<ProductProvider>();
+    final updated = product.copyWith(isActive: newStatus);
+    final success = await productProvider.updateProduct(updated);
+    if (context.mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              newStatus
+                  ? '✅ Đã mở bán lại sản phẩm "${product.name}"'
+                  : '⏸️ Đã chuyển "${product.name}" sang trạng thái Ngừng kinh doanh',
+            ),
+            backgroundColor: newStatus ? AppColors.success : Colors.orange.shade800,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(productProvider.errorMessage ?? 'Thao tác thất bại'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   void _confirmDeleteProduct(BuildContext context, ProductModel product) {
+    // Nếu sản phẩm đã phát sinh đơn hàng trong quá khứ -> Khóa Hard Delete để bảo toàn chứng từ kế toán
+    if (product.soldCount > 0) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.shield_outlined, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Bảo toàn chứng từ kế toán', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: Text(
+            'Sản phẩm "${product.name}" đã phát sinh ${product.soldCount} lượt bán trong các đơn hàng trước đây.\n\n'
+            'Để tránh làm sai lệch lịch sử giao dịch và đối soát doanh thu, bạn không thể xóa vĩnh viễn sản phẩm này. Thay vào đó, hãy chọn "Ngừng kinh doanh" để ẩn sản phẩm khỏi khách mua mới.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('ĐÓNG', style: TextStyle(color: Colors.grey)),
+            ),
+            if (product.isActive)
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _toggleProductStatus(context, product);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange.shade800,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('NGỪNG KINH DOANH'),
+              ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Nếu chưa từng bán sản phẩm nào (soldCount == 0) -> Cho phép xóa vĩnh viễn
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -81,217 +149,12 @@ class _AdminProductListScreenState extends State<AdminProductListScreen> {
     );
   }
 
-  /// Hộp thoại Nhập kho nhanh (+Stock) và chuyển trạng thái kinh doanh
+  /// Hộp thoại Nhập kho nhanh (+Stock) và chuyển trạng thái kinh doanh (StatefulWidget độc lập)
   void _showQuickRestockDialog(BuildContext context, ProductModel product) {
-    final stockController = TextEditingController(text: '10');
-    String? selectedSku;
-    bool isActive = product.isActive;
-
-    // Danh sách SKU nếu có
-    final skuKeys = product.variantStock.keys.toList();
-
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) {
-          return AlertDialog(
-            title: Row(
-              children: [
-                const Icon(Icons.add_box_outlined, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Nhập kho: ${product.name}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Tổng tồn kho hiện tại:',
-                          style: TextStyle(fontSize: 13),
-                        ),
-                        Text(
-                          '${product.stock} sp',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  if (skuKeys.isNotEmpty) ...[
-                    const Text(
-                      'Chọn biến thể SKU cần nhập thêm:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String?>(
-                      initialValue: selectedSku,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                      ),
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('Tất cả (Cộng dồn kho chung)'),
-                        ),
-                        ...skuKeys.map((sku) {
-                          final currentSkuStock =
-                              product.variantStock[sku] ?? 0;
-                          return DropdownMenuItem<String?>(
-                            value: sku,
-                            child: Text('$sku (hiện có: $currentSkuStock)'),
-                          );
-                        }),
-                      ],
-                      onChanged: (val) {
-                        setDialogState(() => selectedSku = val);
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-
-                  TextFormField(
-                    controller: stockController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Số lượng nhập thêm (+Stock) *',
-                      hintText: 'VD: 10, 50, 100',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.inventory_outlined),
-                      suffixText: 'sản phẩm',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  Material(
-                    color: Colors.transparent,
-                    child: SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Trạng thái kinh doanh',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text(
-                        isActive ? 'Đang mở bán' : 'Đang ngừng bán',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isActive ? AppColors.success : AppColors.error,
-                        ),
-                      ),
-                      value: isActive,
-                      activeThumbColor: AppColors.success,
-                      onChanged: (val) {
-                        setDialogState(() => isActive = val);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('HỦY', style: TextStyle(color: Colors.grey)),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final addStock = int.tryParse(stockController.text.trim()) ?? 0;
-                  if (addStock < 0 || (addStock == 0 && isActive == product.isActive)) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Vui lòng nhập số lượng hợp lệ (>= 0)'),
-                        backgroundColor: AppColors.error,
-                      ),
-                    );
-                    return;
-                  }
-
-                  Navigator.pop(ctx);
-                  final productProvider = context.read<ProductProvider>();
-
-                  bool success = true;
-                  if (addStock > 0) {
-                    success = await productProvider.quickRestockProduct(
-                      productId: product.id,
-                      additionalStock: addStock,
-                      skuKey: selectedSku,
-                    );
-                  }
-
-                  // Cập nhật trạng thái isActive nếu có thay đổi
-                  if (isActive != product.isActive) {
-                    final updated = product.copyWith(isActive: isActive);
-                    await productProvider.updateProduct(updated);
-                  }
-
-                  if (context.mounted) {
-                    if (success) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '✅ Đã nhập kho thành công cho "${product.name}"!',
-                          ),
-                          backgroundColor: AppColors.success,
-                        ),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            productProvider.errorMessage ??
-                                'Nhập kho thất bại',
-                          ),
-                          backgroundColor: AppColors.error,
-                        ),
-                      );
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('CẬP NHẬT KHO'),
-              ),
-            ],
-          );
-        },
-      ),
-    ).whenComplete(() => stockController.dispose());
+      builder: (_) => _QuickRestockDialog(product: product),
+    );
   }
 
   /// Mở hộp thoại Quản lý Danh mục (Thêm / Sửa / Xóa)
@@ -863,14 +726,11 @@ class _AdminProductListScreenState extends State<AdminProductListScreen> {
                 height: 80,
                 color: Colors.grey.shade100,
                 child: product.imageUrls.isNotEmpty
-                    ? CachedNetworkImage(
+                    ? AppImage(
                         imageUrl: product.imageUrls.first,
+                        width: 80,
+                        height: 80,
                         fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => const Icon(
-                          Icons.broken_image,
-                          size: 30,
-                          color: Colors.grey,
-                        ),
                       )
                     : const Icon(Icons.image, size: 30, color: Colors.grey),
               ),
@@ -994,7 +854,7 @@ class _AdminProductListScreenState extends State<AdminProductListScreen> {
               ),
             ),
 
-            // Nút Thao tác: Sửa & Xóa
+            // Nút Thao tác: Sửa, Bật/Tắt Trạng thái & Xóa
             Column(
               children: [
                 IconButton(
@@ -1010,6 +870,21 @@ class _AdminProductListScreenState extends State<AdminProductListScreen> {
                       ),
                     );
                   },
+                ),
+                IconButton(
+                  icon: Icon(
+                    product.isActive
+                        ? Icons.pause_circle_outline
+                        : Icons.play_circle_outline,
+                    color: product.isActive
+                        ? Colors.orange.shade800
+                        : AppColors.success,
+                    size: 20,
+                  ),
+                  tooltip: product.isActive
+                      ? 'Ngừng kinh doanh'
+                      : 'Mở bán lại',
+                  onPressed: () => _toggleProductStatus(context, product),
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline,
@@ -1043,3 +918,233 @@ class _AdminProductListScreenState extends State<AdminProductListScreen> {
     );
   }
 }
+
+/// Hộp thoại Nhập kho nhanh và đổi trạng thái độc lập (StatefulWidget)
+class _QuickRestockDialog extends StatefulWidget {
+  final ProductModel product;
+
+  const _QuickRestockDialog({required this.product});
+
+  @override
+  State<_QuickRestockDialog> createState() => _QuickRestockDialogState();
+}
+
+class _QuickRestockDialogState extends State<_QuickRestockDialog> {
+  late final TextEditingController _stockController;
+  String? _selectedSku;
+  late bool _isActive;
+
+  @override
+  void initState() {
+    super.initState();
+    _stockController = TextEditingController(text: '10');
+    _isActive = widget.product.isActive;
+  }
+
+  @override
+  void dispose() {
+    _stockController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.product;
+    final skuKeys = product.variantStock.keys.toList();
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.add_box_outlined, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Nhập kho: ${product.name}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Tổng tồn kho hiện tại:',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  Text(
+                    '${product.stock} sp',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            if (skuKeys.isNotEmpty) ...[
+              const Text(
+                'Chọn biến thể SKU cần nhập thêm:',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<String?>(
+                initialValue: _selectedSku,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Tất cả (Cộng dồn kho chung)'),
+                  ),
+                  ...skuKeys.map((sku) {
+                    final currentSkuStock = product.variantStock[sku] ?? 0;
+                    return DropdownMenuItem<String?>(
+                      value: sku,
+                      child: Text('$sku (hiện có: $currentSkuStock)'),
+                    );
+                  }),
+                ],
+                onChanged: (val) {
+                  setState(() => _selectedSku = val);
+                },
+              ),
+              const SizedBox(height: 14),
+            ],
+
+            TextFormField(
+              controller: _stockController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Số lượng nhập thêm (+Stock) *',
+                hintText: 'VD: 10, 50, 100',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.inventory_outlined),
+                suffixText: 'sản phẩm',
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            Material(
+              color: Colors.transparent,
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(
+                  'Trạng thái kinh doanh',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  _isActive ? 'Đang mở bán' : 'Đang ngừng bán',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _isActive ? AppColors.success : AppColors.error,
+                  ),
+                ),
+                value: _isActive,
+                activeThumbColor: AppColors.success,
+                onChanged: (val) {
+                  setState(() => _isActive = val);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('HỦY', style: TextStyle(color: Colors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            final addStock = int.tryParse(_stockController.text.trim()) ?? 0;
+            if (addStock < 0 || (addStock == 0 && _isActive == product.isActive)) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Vui lòng nhập số lượng hợp lệ (>= 0)'),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+              return;
+            }
+
+            Navigator.pop(context);
+            final productProvider = context.read<ProductProvider>();
+
+            bool success = true;
+            if (addStock > 0) {
+              success = await productProvider.quickRestockProduct(
+                productId: product.id,
+                additionalStock: addStock,
+                skuKey: _selectedSku,
+              );
+            }
+
+            // Cập nhật trạng thái isActive nếu có thay đổi
+            if (_isActive != product.isActive) {
+              final updated = product.copyWith(isActive: _isActive);
+              await productProvider.updateProduct(updated);
+            }
+
+            if (context.mounted) {
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '✅ Đã nhập kho thành công cho "${product.name}"!',
+                    ),
+                    backgroundColor: AppColors.success,
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      productProvider.errorMessage ?? 'Nhập kho thất bại',
+                    ),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('CẬP NHẬT KHO'),
+        ),
+      ],
+    );
+  }
+}
+

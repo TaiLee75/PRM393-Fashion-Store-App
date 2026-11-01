@@ -63,19 +63,17 @@ class ProductProvider extends ChangeNotifier {
     return count;
   }
 
-  /// Danh sách sản phẩm sau khi đã lọc cho Khách hàng (Chỉ hiển thị p.isActive == true - Khóa Bẫy 14)
+  /// Danh sách sản phẩm sau khi đã lọc cho Khách hàng (Khóa Bẫy 14: Chỉ sản phẩm isActive == true)
   List<ProductModel> get filteredProducts {
-    List<ProductModel> list = List.from(_products);
+    // Chỉ lấy sản phẩm đang hoạt động (isActive)
+    var list = _products.where((p) => p.isActive).toList();
 
-    // 1. Chỉ hiển thị sản phẩm đang kinh doanh cho Khách hàng
-    list = list.where((p) => p.isActive).toList();
-
-    // 2. Lọc theo danh mục đã chọn
+    // 1. Lọc theo danh mục đã chọn
     if (_selectedCategoryId != 'all') {
       list = list.where((p) => p.categoryId == _selectedCategoryId).toList();
     }
 
-    // 3. Lọc theo từ khóa tìm kiếm (Real-time search)
+    // 2. Lọc theo từ khóa tìm kiếm (Real-time search)
     if (_searchQuery.trim().isNotEmpty) {
       final query = _searchQuery.trim().toLowerCase();
       list = list.where((p) {
@@ -85,7 +83,7 @@ class ProductProvider extends ChangeNotifier {
       }).toList();
     }
 
-    // 4. Lọc theo khoảng giá
+    // 3. Lọc theo khoảng giá
     if (_selectedPriceRange == 'under_200k') {
       list = list.where((p) => p.price < 200000).toList();
     } else if (_selectedPriceRange == '200k_400k') {
@@ -94,24 +92,24 @@ class ProductProvider extends ChangeNotifier {
       list = list.where((p) => p.price > 400000).toList();
     }
 
-    // 5. Lọc theo Kích cỡ (Size)
+    // 4. Lọc theo Kích cỡ (Size)
     if (_selectedSize != null && _selectedSize!.isNotEmpty) {
       list = list.where((p) => p.sizes.contains(_selectedSize)).toList();
     }
 
-    // 6. Lọc theo Màu sắc (Color)
+    // 5. Lọc theo Màu sắc (Color)
     if (_selectedColor != null && _selectedColor!.isNotEmpty) {
       list = list.where((p) => p.colors.contains(_selectedColor)).toList();
     }
 
-    // 7. Lọc sản phẩm đang giảm giá (on_sale)
+    // 6. Lọc sản phẩm đang giảm giá (on_sale)
     if (_isOnSaleOnly) {
       list = list
           .where((p) => p.originalPrice != null && p.originalPrice! > p.price)
           .toList();
     }
 
-    // 8. Sắp xếp (Sort)
+    // 7. Sắp xếp (Sort)
     switch (_sortBy) {
       case 'price_asc':
         list.sort((a, b) => a.price.compareTo(b.price));
@@ -132,7 +130,6 @@ class ProductProvider extends ChangeNotifier {
         });
         break;
     }
-
     return list;
   }
 

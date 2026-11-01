@@ -103,12 +103,16 @@ class AppValidators {
     return null;
   }
 
-  /// Kiểm tra đường dẫn URL hình ảnh
+  /// Kiểm tra đường dẫn URL hoặc chuỗi Base64 Data URI hình ảnh
   static String? validateUrl(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Vui lòng nhập link hình ảnh';
+      return 'Vui lòng nhập link hoặc tải ảnh sản phẩm';
     }
-    if (!_urlRegExp.hasMatch(value.trim())) {
+    final trimmed = value.trim();
+    if (trimmed.startsWith('data:image/')) {
+      return null; // Chuỗi Base64 Data URI hợp lệ
+    }
+    if (!_urlRegExp.hasMatch(trimmed)) {
       return 'Đường dẫn phải bắt đầu bằng http:// hoặc https://';
     }
     return null;

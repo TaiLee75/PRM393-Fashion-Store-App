@@ -8,6 +8,8 @@ class UserModel {
   final String phone;
   final String avatarUrl;
   final String defaultAddress;
+  final double? defaultLatitude;
+  final double? defaultLongitude;
   final String role; // "customer" hoặc "admin"
   final DateTime createdAt;
 
@@ -23,6 +25,8 @@ class UserModel {
     this.phone = '',
     this.avatarUrl = '',
     this.defaultAddress = '',
+    this.defaultLatitude,
+    this.defaultLongitude,
     this.role = 'customer',
     required this.createdAt,
     this.savedAddresses = const [],
@@ -55,6 +59,32 @@ class UserModel {
       if (addr.isNotEmpty) return addr;
     }
     return defaultAddress;
+  }
+
+  /// Vĩ độ nhận hàng ưu tiên (từ địa chỉ mặc định trong sổ nếu có, hoặc defaultLatitude hồ sơ)
+  double? get effectiveDefaultLatitude {
+    if (savedAddresses.isNotEmpty) {
+      final defaultItem = savedAddresses.firstWhere(
+        (a) => a['isDefault'] == true,
+        orElse: () => const {},
+      );
+      final lat = (defaultItem['latitude'] as num?)?.toDouble();
+      if (lat != null) return lat;
+    }
+    return defaultLatitude;
+  }
+
+  /// Kinh độ nhận hàng ưu tiên (từ địa chỉ mặc định trong sổ nếu có, hoặc defaultLongitude hồ sơ)
+  double? get effectiveDefaultLongitude {
+    if (savedAddresses.isNotEmpty) {
+      final defaultItem = savedAddresses.firstWhere(
+        (a) => a['isDefault'] == true,
+        orElse: () => const {},
+      );
+      final lng = (defaultItem['longitude'] as num?)?.toDouble();
+      if (lng != null) return lng;
+    }
+    return defaultLongitude;
   }
 
   /// Họ tên người nhận ưu tiên (Lấy từ mục mặc định trong sổ địa chỉ nếu có, hoặc fallback về fullName)
@@ -129,6 +159,10 @@ class UserModel {
       phone: map['phone'] as String? ?? '',
       avatarUrl: map['avatarUrl'] as String? ?? '',
       defaultAddress: map['defaultAddress'] as String? ?? '',
+      defaultLatitude: (map['defaultLatitude'] as num?)?.toDouble() ??
+          (map['defaultAddressLatitude'] as num?)?.toDouble(),
+      defaultLongitude: (map['defaultLongitude'] as num?)?.toDouble() ??
+          (map['defaultAddressLongitude'] as num?)?.toDouble(),
       role: (map['role'] as String?)?.toLowerCase() ?? 'customer',
       createdAt: parseDate(map['createdAt']),
       savedAddresses: parsedAddresses,
@@ -145,6 +179,8 @@ class UserModel {
       'phone': phone,
       'avatarUrl': avatarUrl,
       'defaultAddress': defaultAddress,
+      'defaultLatitude': defaultLatitude,
+      'defaultLongitude': defaultLongitude,
       'role': role,
       'createdAt': Timestamp.fromDate(createdAt),
       'savedAddresses': savedAddresses,
@@ -160,6 +196,8 @@ class UserModel {
     String? phone,
     String? avatarUrl,
     String? defaultAddress,
+    double? defaultLatitude,
+    double? defaultLongitude,
     String? role,
     DateTime? createdAt,
     List<Map<String, dynamic>>? savedAddresses,
@@ -173,6 +211,8 @@ class UserModel {
       phone: phone ?? this.phone,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       defaultAddress: defaultAddress ?? this.defaultAddress,
+      defaultLatitude: defaultLatitude ?? this.defaultLatitude,
+      defaultLongitude: defaultLongitude ?? this.defaultLongitude,
       role: role ?? this.role,
       createdAt: createdAt ?? this.createdAt,
       savedAddresses: savedAddresses ?? this.savedAddresses,

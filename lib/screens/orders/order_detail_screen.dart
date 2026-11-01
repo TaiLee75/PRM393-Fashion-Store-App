@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
@@ -15,6 +16,7 @@ import '../admin/admin_chat_inbox_screen.dart';
 import '../cart/widgets/vietqr_dialog.dart';
 import '../chat/chat_screen.dart';
 import '../main_nav_screen.dart';
+import '../map/store_map_screen.dart';
 
 /// Màn hình Chi tiết Đơn hàng toàn diện (Task 3.5: Khóa Bẫy 8, 16, 18, 20)
 /// Hỗ trợ: Stepper Timeline đa mốc, Hủy đơn (hoàn kho & hoàn tiền), Đổi/Trả hàng, Đánh giá sản phẩm, Mua lại & Đối soát VietQR
@@ -139,18 +141,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text(
-          'Đã nhận được hàng?',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        title: Text(
+          order.isPickup ? 'Đã lấy hàng tại quầy?' : 'Đã nhận được hàng?',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
-        content: const Text(
-          'Bạn đã nhận được toàn bộ kiện hàng và hài lòng với các sản phẩm?',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        content: Text(
+          order.isPickup
+              ? 'Bạn đã đến cửa hàng và nhận đủ các món hàng trong đơn?'
+              : 'Bạn đã nhận được toàn bộ kiện hàng và hài lòng với các sản phẩm?',
+          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('CHƯA NHẬN', style: TextStyle(color: Colors.grey)),
+            child: Text(order.isPickup ? 'CHƯA LẤY' : 'CHƯA NHẬN', style: const TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -158,7 +162,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               backgroundColor: AppColors.success,
               foregroundColor: Colors.white,
             ),
-            child: const Text('ĐÃ NHẬN HÀNG'),
+            child: Text(order.isPickup ? 'ĐÃ LẤY HÀNG' : 'ĐÃ NHẬN HÀNG'),
           ),
         ],
       ),
@@ -325,6 +329,310 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         SnackBar(
           content: Text(
             success ? '✅ Đã xác nhận hoàn tiền thành công!' : '❌ Thao tác thất bại. Vui lòng thử lại!',
+          ),
+          backgroundColor: success ? AppColors.success : AppColors.error,
+        ),
+      );
+    }
+  }
+
+  /// 6b. Admin duyệt giao hàng cho đơn vị vận chuyển
+  Future<void> _handleAdminApproveDelivery(OrderModel order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(order.isPickup ? Icons.storefront : Icons.local_shipping, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text(order.isPickup ? 'Chuẩn bị xong đơn hàng' : 'Duyệt giao đơn hàng', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          order.isPickup
+              ? 'Xác nhận đơn hàng #${order.orderId.length > 8 ? order.orderId.substring(0, 8).toUpperCase() : order.orderId.toUpperCase()} đã được chuẩn bị xong và sẵn sàng để khách đến nhận tại quầy?'
+              : 'Xác nhận duyệt giao đơn hàng #${order.orderId.length > 8 ? order.orderId.substring(0, 8).toUpperCase() : order.orderId.toUpperCase()} cho đơn vị vận chuyển?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('HỦY', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(order.isPickup ? 'CHUẨN BỊ XONG' : 'DUYỆT GIAO'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() => _isProcessing = true);
+      final orderProvider = context.read<OrderProvider>();
+      final success = await orderProvider.updateOrderStatus(
+        orderId: order.orderId,
+        newStatus: OrderModel.statusDelivering,
+        userId: order.userId,
+      );
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? (order.isPickup ? '✅ Đã chuẩn bị xong! Đơn đã chuyển sang "Sẵn sàng nhận".' : '✅ Đã duyệt giao đơn hàng thành công!')
+                : '❌ Duyệt giao thất bại. Vui lòng thử lại!',
+          ),
+          backgroundColor: success ? AppColors.success : AppColors.error,
+        ),
+      );
+    }
+  }
+
+  /// 6c. Admin xác nhận đơn hàng đã giao thành công (hoặc khách đã lấy tại quầy)
+  Future<void> _handleAdminConfirmDelivered(OrderModel order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.check_circle, color: AppColors.success),
+            const SizedBox(width: 8),
+            Text(order.isPickup ? 'Xác nhận khách đã lấy hàng' : 'Xác nhận giao thành công', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          order.isPickup
+              ? 'Xác nhận đơn hàng #${order.orderId.length > 8 ? order.orderId.substring(0, 8).toUpperCase() : order.orderId.toUpperCase()} đã được khách hàng đến lấy tại quầy hoàn tất?'
+              : 'Xác nhận đơn hàng #${order.orderId.length > 8 ? order.orderId.substring(0, 8).toUpperCase() : order.orderId.toUpperCase()} đã được giao hoàn tất đến khách hàng?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('HỦY', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(order.isPickup ? 'XÁC NHẬN ĐÃ LẤY' : 'XÁC NHẬN ĐÃ GIAO'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() => _isProcessing = true);
+      final orderProvider = context.read<OrderProvider>();
+      final success = await orderProvider.updateOrderStatus(
+        orderId: order.orderId,
+        newStatus: OrderModel.statusDelivered,
+        userId: order.userId,
+      );
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? (order.isPickup ? '✅ Đã xác nhận khách lấy hàng thành công!' : '✅ Đã xác nhận giao hàng thành công!')
+                : '❌ Thao tác thất bại. Vui lòng thử lại!',
+          ),
+          backgroundColor: success ? AppColors.success : AppColors.error,
+        ),
+      );
+    }
+  }
+
+  /// 6d. Admin từ chối hoặc hủy đơn kèm lý do
+  Future<void> _handleAdminCancelOrder(OrderModel order) async {
+    final reasonController = TextEditingController(text: 'Cửa hàng hết hàng / Không liên hệ được khách');
+    final confirmed = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.cancel, color: AppColors.error),
+            SizedBox(width: 8),
+            Text('Từ chối / Hủy đơn', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Nhập lý do từ chối hoặc hủy đơn hàng này:',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Lý do hủy...',
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('QUAY LẠI', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, reasonController.text.trim()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('HỦY ĐƠN'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != null && confirmed.isNotEmpty && mounted) {
+      setState(() => _isProcessing = true);
+      final orderProvider = context.read<OrderProvider>();
+      final success = await orderProvider.cancelOrder(
+        order.orderId,
+        cancelReason: confirmed,
+        cancelledBy: 'admin',
+      );
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? '✅ Đã hủy đơn hàng và hoàn kho SKU thành công!' : '❌ Hủy đơn thất bại. Vui lòng thử lại!',
+          ),
+          backgroundColor: success ? AppColors.success : AppColors.error,
+        ),
+      );
+    }
+  }
+
+  /// 6e. Admin duyệt yêu cầu đổi/trả & hoàn kho
+  Future<void> _handleAdminApproveReturn(OrderModel order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.assignment_return, color: Colors.purple),
+            SizedBox(width: 8),
+            Text('Duyệt đổi/trả & hoàn kho', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Chấp thuận yêu cầu Đổi/Trả cho đơn #${order.orderId.length > 8 ? order.orderId.substring(0, 8).toUpperCase() : order.orderId.toUpperCase()}? Hệ thống sẽ hoàn kho các sản phẩm và chuyển sang trạng thái chờ hoàn tiền.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('HỦY', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('DUYỆT ĐỔI/TRẢ'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() => _isProcessing = true);
+      final orderProvider = context.read<OrderProvider>();
+      final success = await orderProvider.approveReturn(order.orderId);
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? '✅ Đã duyệt đổi/trả và hoàn kho SKU thành công!' : '❌ Thao tác thất bại. Vui lòng thử lại!',
+          ),
+          backgroundColor: success ? AppColors.success : AppColors.error,
+        ),
+      );
+    }
+  }
+
+  /// 6f. Admin từ chối yêu cầu đổi/trả
+  Future<void> _handleAdminRejectReturn(OrderModel order) async {
+    final reasonController = TextEditingController(text: 'Sản phẩm không đáp ứng điều kiện đổi trả');
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.highlight_off, color: AppColors.error),
+            SizedBox(width: 8),
+            Text('Từ chối đổi/trả', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Nhập lý do từ chối yêu cầu đổi trả:',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Lý do từ chối...',
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('QUAY LẠI', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, reasonController.text.trim()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('TỪ CHỐI'),
+          ),
+        ],
+      ),
+    );
+
+    if (reason != null && reason.isNotEmpty && mounted) {
+      setState(() => _isProcessing = true);
+      final orderProvider = context.read<OrderProvider>();
+      final success = await orderProvider.rejectReturn(order.orderId, reason: reason);
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? '✅ Đã từ chối yêu cầu đổi trả!' : '❌ Thao tác thất bại. Vui lòng thử lại!',
           ),
           backgroundColor: success ? AppColors.success : AppColors.error,
         ),
@@ -726,16 +1034,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     // Stepper 3 bước mặc định (Pending -> Delivering -> Delivered)
     int currentStep = 1;
     Color statusColor = AppColors.warning;
-    String statusTitle = 'Đang chờ shop xác nhận';
+    String statusTitle = order.isPickup ? 'Đang chờ cửa hàng chuẩn bị' : 'Đang chờ shop xác nhận';
 
     if (order.status == OrderModel.statusDelivering) {
       currentStep = 2;
       statusColor = Colors.blue;
-      statusTitle = 'Đơn hàng đang trên đường giao';
+      statusTitle = order.isPickup ? 'Đơn hàng đã sẵn sàng nhận tại quầy' : 'Đơn hàng đang trên đường giao';
     } else if (order.status == OrderModel.statusDelivered) {
       currentStep = 3;
       statusColor = AppColors.success;
-      statusTitle = 'Đã giao hàng thành công';
+      statusTitle = order.isPickup ? 'Đã nhận hàng tại cửa hàng' : 'Đã giao hàng thành công';
     }
 
     return Container(
@@ -786,15 +1094,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               _buildStepLine(isActive: currentStep >= 2),
               _buildStepItem(
                 stepIndex: 2,
-                label: 'Đang giao',
-                icon: Icons.local_shipping,
+                label: order.isPickup ? 'Sẵn sàng' : 'Đang giao',
+                icon: order.isPickup ? Icons.storefront : Icons.local_shipping,
                 isActive: currentStep >= 2,
                 isCompleted: currentStep > 2,
               ),
               _buildStepLine(isActive: currentStep >= 3),
               _buildStepItem(
                 stepIndex: 3,
-                label: 'Đã nhận',
+                label: order.isPickup ? 'Đã lấy' : 'Đã nhận',
                 icon: Icons.check_circle,
                 isActive: currentStep >= 3,
                 isCompleted: currentStep >= 3,
@@ -855,10 +1163,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  /// Thẻ các nút hành động theo vòng đời đơn hàng
+  /// Thẻ các nút hành động theo vòng đời đơn hàng (Phân tách độc lập Admin vs Khách hàng)
   Widget _buildOrderActionsCard(OrderModel order, {required bool isCurrentAdmin}) {
-    // 0. Nếu là Admin và đơn đang ở trạng thái Chờ Shop Hoàn Tiền (RefundPending)
-    if (isCurrentAdmin && order.isRefundPending) {
+    if (isCurrentAdmin) {
+      return _buildAdminOrderActions(order);
+    }
+    return _buildCustomerOrderActions(order);
+  }
+
+  /// Bộ nút điều khiển của Quản trị viên (Admin Actions)
+  Widget _buildAdminOrderActions(OrderModel order) {
+    // 0. Nếu đơn đang ở trạng thái Chờ Shop Hoàn Tiền (RefundPending)
+    if (order.isRefundPending) {
       return Container(
         margin: const EdgeInsets.only(bottom: 8),
         width: double.infinity,
@@ -879,6 +1195,183 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       );
     }
 
+    // 1. Đơn Pending: Admin có nút [ Duyệt giao hàng / Chuẩn bị xong ] và [ Từ chối / Hủy đơn ]
+    if (order.status == OrderModel.statusPending) {
+      return Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () => _handleAdminApproveDelivery(order),
+              icon: Icon(order.isPickup ? Icons.storefront : Icons.local_shipping_outlined, size: 16),
+              label: Text(
+                order.isPickup ? 'Chuẩn bị xong' : 'Duyệt giao hàng',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => _handleAdminCancelOrder(order),
+              icon: const Icon(Icons.cancel_outlined, size: 16),
+              label: const Text('Từ chối / Hủy đơn', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                side: const BorderSide(color: AppColors.error),
+                foregroundColor: AppColors.error,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 2. Đơn Delivering: Admin có nút [ Xác nhận đã giao / Khách đã lấy ]
+    if (order.status == OrderModel.statusDelivering) {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => _handleAdminConfirmDelivered(order),
+          icon: Icon(order.isPickup ? Icons.storefront : Icons.check_circle_outline, size: 18),
+          label: Text(
+            order.isPickup ? 'XÁC NHẬN KHÁCH ĐÃ LẤY HÀNG' : 'XÁC NHẬN GIAO THÀNH CÔNG',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.success,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          ),
+        ),
+      );
+    }
+
+    // 3. Đơn ReturnRequested: Admin có nút [ Duyệt Đổi/Trả & Hoàn kho ] và [ Từ chối Đổi/Trả ]
+    if (order.status == OrderModel.statusReturnRequested) {
+      return Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () => _handleAdminApproveReturn(order),
+              icon: const Icon(Icons.assignment_return, size: 16),
+              label: const Text('Duyệt Đổi/Trả & Hoàn kho', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple.shade700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => _handleAdminRejectReturn(order),
+              icon: const Icon(Icons.close, size: 16),
+              label: const Text('Từ chối Đổi/Trả', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                side: const BorderSide(color: AppColors.error),
+                foregroundColor: AppColors.error,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 4. Đơn Delivered: Banner thông báo hoàn tất cho Admin (KHÔNG hiển thị Đánh giá / Đổi trả / Mua lại của khách)
+    if (order.status == OrderModel.statusDelivered) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.green.shade200),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle, color: AppColors.success, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                order.isPickup
+                    ? '✅ ĐƠN HÀNG ĐÃ NHẬN: Khách hàng đã đến quầy nhận hàng và thanh toán hoàn tất.'
+                    : '✅ ĐƠN HÀNG ĐÃ GIAO THÀNH CÔNG: Khách hàng đã nhận đơn và thanh toán hoàn tất.',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.success,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 5. Đơn Cancelled: Banner thông báo hủy cho Admin
+    if (order.status == OrderModel.statusCancelled) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.red.shade200),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.cancel, color: AppColors.error, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '❌ ĐƠN HÀNG ĐÃ BỊ HỦY (${order.cancelledBy == 'admin' ? 'Bởi Shop' : 'Bởi Khách hàng'}). Tồn kho SKU đã được hoàn lại.',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.error,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 6. Đơn Returned: Banner thông báo đã hoàn trả
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.purple.shade50,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.purple.shade200),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.assignment_return, color: Colors.purple, size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '📦 ĐƠN HÀNG ĐÃ HOÀN TRẢ: Hàng đã được kiểm định và nhập lại kho thành công.',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.purple,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Bộ nút điều khiển của Khách hàng (Customer Actions)
+  Widget _buildCustomerOrderActions(OrderModel order) {
     // 1. Đơn Pending: Nút Sửa thông tin & Nút Hủy đơn
     if (order.status == OrderModel.statusPending) {
       return Row(
@@ -912,8 +1405,104 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       );
     }
 
-    // 2. Đơn Delivering: Nút "Đã nhận được hàng"
+    // 2. Đơn Delivering / Sẵn sàng nhận
     if (order.status == OrderModel.statusDelivering) {
+      if (order.isPickup) {
+        // Phương án A: Thẻ Phiếu nhận hàng tại cửa hàng (Pickup Pass) dành riêng cho khách
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.green.shade200),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.green.withValues(alpha: 0.06),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.storefront, color: AppColors.success, size: 20),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'PHIẾU NHẬN HÀNG TẠI CỬA HÀNG',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.success,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.ultraLightGrey,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'MÃ NHẬN HÀNG CỦA BẠN',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '#${order.displayOrderId}',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.primary,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: AppColors.textSecondary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Vui lòng đến chi nhánh ${order.pickupBranchName.isNotEmpty ? order.pickupBranchName : "cửa hàng"} và xuất trình mã nhận hàng trên cho nhân viên quầy để kiểm tra và nhận đồ.',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }
+
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
@@ -1050,11 +1639,45 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
           if (order.deliveringAt != null) ...[
             const SizedBox(height: 6),
-            _buildInfoRow('Bắt đầu giao:', AppFormatters.formatDateTime(order.deliveringAt!)),
+            _buildInfoRow(order.isPickup ? 'Sẵn sàng từ:' : 'Bắt đầu giao:', AppFormatters.formatDateTime(order.deliveringAt!)),
           ],
           if (order.deliveredAt != null) ...[
             const SizedBox(height: 6),
-            _buildInfoRow('Giao thành công:', AppFormatters.formatDateTime(order.deliveredAt!)),
+            _buildInfoRow(order.isPickup ? 'Đã nhận lúc:' : 'Giao thành công:', AppFormatters.formatDateTime(order.deliveredAt!)),
+          ],
+          if (order.shippingAddress.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StoreMapScreen(
+                        viewOrderAddress: order.shippingAddress,
+                        viewOrderRecipient: '${order.userName} • ${order.phone}',
+                        viewOrderLocation: (order.shippingLatitude != null &&
+                                order.shippingLongitude != null)
+                            ? LatLng(order.shippingLatitude!,
+                                order.shippingLongitude!)
+                            : null,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.map_outlined, size: 16),
+                label: const Text(
+                  'XEM VỊ TRÍ GIAO HÀNG TRÊN BẢN ĐỒ',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
           ],
         ],
       ),

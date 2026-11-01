@@ -28,6 +28,8 @@ class OrderModel {
   final String userName;
   final String phone;
   final String shippingAddress;
+  final double? shippingLatitude;
+  final double? shippingLongitude;
   final List<CartItemModel> items;
 
   // Bóc tách tài chính
@@ -68,6 +70,8 @@ class OrderModel {
     required this.userName,
     required this.phone,
     required this.shippingAddress,
+    this.shippingLatitude,
+    this.shippingLongitude,
     required this.items,
     required this.subtotal,
     this.voucherCode = '',
@@ -172,15 +176,19 @@ class OrderModel {
   bool get isVietQrPendingPayment =>
       isVietQr && status == statusPending && paymentStatus == paymentUnpaid;
 
+  /// Mã đơn hàng rút gọn hiển thị (8 ký tự đầu viết hoa)
+  String get displayOrderId =>
+      orderId.length > 8 ? orderId.substring(0, 8).toUpperCase() : orderId.toUpperCase();
+
   /// Hiển thị tên trạng thái vận hành tiếng Việt chuẩn UX
   String get statusText {
     switch (status) {
       case statusPending:
         return 'Chờ xác nhận';
       case statusDelivering:
-        return 'Đang giao hàng';
+        return isPickup ? 'Sẵn sàng nhận' : 'Đang giao hàng';
       case statusDelivered:
-        return 'Đã giao thành công';
+        return isPickup ? 'Đã nhận hàng' : 'Đã giao thành công';
       case statusCancelled:
         return 'Đã hủy đơn';
       case statusReturnRequested:
@@ -285,6 +293,8 @@ class OrderModel {
       userName: map['userName'] as String? ?? '',
       phone: map['phone'] as String? ?? '',
       shippingAddress: map['shippingAddress'] as String? ?? '',
+      shippingLatitude: (map['shippingLatitude'] as num?)?.toDouble(),
+      shippingLongitude: (map['shippingLongitude'] as num?)?.toDouble(),
       items: parsedItems,
       subtotal: parsedSubtotal,
       voucherCode: map['voucherCode'] as String? ?? '',
@@ -318,6 +328,8 @@ class OrderModel {
       'userName': userName,
       'phone': phone,
       'shippingAddress': shippingAddress,
+      'shippingLatitude': shippingLatitude,
+      'shippingLongitude': shippingLongitude,
       'items': items.map((i) => i.toMap()).toList(),
       'subtotal': subtotal,
       'voucherCode': voucherCode,
@@ -353,6 +365,8 @@ class OrderModel {
     String? userName,
     String? phone,
     String? shippingAddress,
+    double? shippingLatitude,
+    double? shippingLongitude,
     List<CartItemModel>? items,
     num? subtotal,
     String? voucherCode,
@@ -383,6 +397,8 @@ class OrderModel {
       userName: userName ?? this.userName,
       phone: phone ?? this.phone,
       shippingAddress: shippingAddress ?? this.shippingAddress,
+      shippingLatitude: shippingLatitude ?? this.shippingLatitude,
+      shippingLongitude: shippingLongitude ?? this.shippingLongitude,
       items: items ?? this.items,
       subtotal: subtotal ?? this.subtotal,
       voucherCode: voucherCode ?? this.voucherCode,

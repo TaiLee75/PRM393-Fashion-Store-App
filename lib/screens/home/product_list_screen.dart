@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/app_image.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
@@ -522,48 +522,27 @@ class _ProductListScreenState extends State<ProductListScreen> {
     AuthProvider authProvider,
   ) {
     final isFav = authProvider.isFavorite(product.id);
-    final isOutOfStock = product.effectiveStock <= 0 || !product.isActive;
+    final isOutOfStock = product.effectiveStock <= 0;
+    final isInactive = !product.isActive;
 
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProductDetailScreen(productId: product.id),
-          ),
-        );
-      },
-      child: Column(
+    final cardWidget = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Ảnh sản phẩm Unsplash với tỷ lệ chuẩn
+          // Ảnh sản phẩm với tỷ lệ chuẩn
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: Stack(
                 children: [
-                  CachedNetworkImage(
+                  AppImage(
                     imageUrl: product.mainImage,
                     width: double.infinity,
                     height: double.infinity,
                     fit: BoxFit.cover,
-                    placeholder: (_, __) => Container(
-                      color: AppColors.ultraLightGrey,
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                    errorWidget: (_, __, ___) => Container(
-                      color: AppColors.ultraLightGrey,
-                      child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
-                    ),
                   ),
 
                   // Huy hiệu giảm giá (Top Left)
-                  if (product.hasDiscount && product.discountPercent > 0)
+                  if (product.hasDiscount && product.discountPercent > 0 && !isInactive)
                     Positioned(
                       top: 6,
                       left: 6,
@@ -623,8 +602,35 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     ),
                   ),
 
-                  // Lớp phủ thông báo Hết hàng (Overlay khi out of stock)
-                  if (isOutOfStock)
+                  // Lớp phủ thông báo Đã ngừng bán hoặc Hết hàng
+                  if (isInactive)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        alignment: Alignment.center,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade700,
+                            borderRadius: BorderRadius.circular(3),
+                            border: Border.all(color: Colors.white, width: 1),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black26, blurRadius: 4),
+                            ],
+                          ),
+                          child: const Text(
+                            'ĐÃ NGỪNG BÁN',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (isOutOfStock)
                     Positioned.fill(
                       child: Container(
                         color: Colors.black.withValues(alpha: 0.5),
@@ -737,7 +743,20 @@ class _ProductListScreenState extends State<ProductListScreen> {
             ),
           ),
         ],
-      ),
+      );
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductDetailScreen(productId: product.id),
+          ),
+        );
+      },
+      child: isInactive
+          ? Opacity(opacity: 0.65, child: cardWidget)
+          : cardWidget,
     );
   }
 
