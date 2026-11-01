@@ -764,6 +764,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             builder: (_) => AdminChatDetailScreen(
                               customerId: order.userId,
                               customerName: order.userName,
+                              initialOrderId: order.orderId,
+                              initialOrderTotalPrice: order.totalPrice,
                             ),
                           ),
                         );
@@ -771,7 +773,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const ChatScreen(isStandalone: true),
+                            builder: (_) => ChatScreen(
+                              isStandalone: true,
+                              initialOrderId: order.orderId,
+                              initialOrderTotalPrice: order.totalPrice,
+                            ),
                           ),
                         );
                       }

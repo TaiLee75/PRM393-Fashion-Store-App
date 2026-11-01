@@ -1,11 +1,19 @@
+import 'dart:math';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/message_model.dart';
+import '../../models/order_model.dart';
+import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
+import '../../providers/order_provider.dart';
+import '../../providers/product_provider.dart';
+import '../home/product_detail_screen.dart';
+import '../orders/order_detail_screen.dart';
 
 /// Màn hình Hộp thư CSKH của Admin (Admin Chat Inbox)
 class AdminChatInboxScreen extends StatefulWidget {
@@ -216,11 +224,21 @@ class _AdminChatInboxScreenState extends State<AdminChatInboxScreen> {
 class AdminChatDetailScreen extends StatefulWidget {
   final String customerId;
   final String customerName;
+  final String? initialOrderId;
+  final num? initialOrderTotalPrice;
+  final String? initialProductId;
+  final String? initialProductName;
+  final String? initialProductImageUrl;
 
   const AdminChatDetailScreen({
     super.key,
     required this.customerId,
     required this.customerName,
+    this.initialOrderId,
+    this.initialOrderTotalPrice,
+    this.initialProductId,
+    this.initialProductName,
+    this.initialProductImageUrl,
   });
 
   @override
@@ -231,11 +249,25 @@ class _AdminChatDetailScreenState extends State<AdminChatDetailScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  // Đính kèm hiện tại đang chờ gửi
+  String? _pendingOrderId;
+  num? _pendingOrderTotalPrice;
+  String? _pendingProductId;
+  String? _pendingProductName;
+  String? _pendingProductImageUrl;
+
   @override
   void initState() {
     super.initState();
+    _pendingOrderId = widget.initialOrderId;
+    _pendingOrderTotalPrice = widget.initialOrderTotalPrice;
+    _pendingProductId = widget.initialProductId;
+    _pendingProductName = widget.initialProductName;
+    _pendingProductImageUrl = widget.initialProductImageUrl;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ChatProvider>().listenMessages(widget.customerId);
+      _scrollToBottom();
     });
   }
 
@@ -256,20 +288,155 @@ class _AdminChatDetailScreenState extends State<AdminChatDetailScreen> {
     }
   }
 
-  Future<void> _handleSend() async {
-    final text = _textController.text.trim();
-    if (text.isEmpty) return;
+  Future<void> _handleSend({String? customText}) async {
+    final text = (customText ?? _textController.text).trim();
+    if (text.isEmpty && _pendingOrderId == null && _pendingProductId == null) {
+      return;
+    }
 
     _textController.clear();
 
+    final orderIdToSend = _pendingOrderId;
+    final orderTotalToSend = _pendingOrderTotalPrice;
+    final prodIdToSend = _pendingProductId;
+    final prodNameToSend = _pendingProductName;
+    final prodImageToSend = _pendingProductImageUrl;
+
+    if (mounted) {
+      setState(() {
+        _pendingOrderId = null;
+        _pendingOrderTotalPrice = null;
+        _pendingProductId = null;
+        _pendingProductName = null;
+        _pendingProductImageUrl = null;
+      });
+    }
+
     await context.read<ChatProvider>().sendMessage(
           customerId: widget.customerId,
-          text: text,
+          text: text.isNotEmpty ? text : 'Xin hỗ trợ thông tin mục đính kèm này',
           senderId: 'shop_admin',
           customerName: widget.customerName,
+          orderId: orderIdToSend,
+          orderTotalPrice: orderTotalToSend,
+          productId: prodIdToSend,
+          productName: prodNameToSend,
+          productImageUrl: prodImageToSend,
         );
 
     _scrollToBottom();
+  }
+
+  void _navigateToOrder(String orderId) {
+    final orderProvider = context.read<OrderProvider>();
+    OrderModel? matchedOrder;
+    for (final o in orderProvider.allOrders) {
+      if (o.orderId == orderId) {
+        matchedOrder = o;
+        break;
+      }
+    }
+    if (matchedOrder == null) {
+      for (final o in orderProvider.userOrders) {
+        if (o.orderId == orderId) {
+          matchedOrder = o;
+          break;
+        }
+      }
+    }
+
+    if (matchedOrder != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OrderDetailScreen(initialOrder: matchedOrder!),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đang tải dữ liệu đơn hàng #$orderId...'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  void _navigateToProduct(String? productId, String? productName) {
+    if (productId == null && productName == null) return;
+    final productProvider = context.read<ProductProvider>();
+    ProductModel? matchedProduct;
+
+    for (final p in productProvider.allProducts) {
+      if (p.id == productId ||
+          (productName != null && p.name == productName)) {
+        matchedProduct = p;
+        break;
+      }
+    }
+
+    if (matchedProduct != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProductDetailScreen(productId: matchedProduct!.id),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sản phẩm hiện đang được cập nhật thông tin.'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  Widget _buildPendingAttachmentPreview() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      color: AppColors.primaryLight.withValues(alpha: 0.35),
+      child: Row(
+        children: [
+          Icon(
+            _pendingOrderId != null
+                ? Icons.receipt_long
+                : Icons.shopping_bag_outlined,
+            size: 20,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _pendingOrderId != null
+                  ? 'Đính kèm đơn hàng #${_pendingOrderId!.substring(0, min(8, _pendingOrderId!.length))} (${AppFormatters.formatCurrency(_pendingOrderTotalPrice ?? 0)})'
+                  : 'Đính kèm sản phẩm: ${_pendingProductName ?? "Sản phẩm thời trang"}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18, color: AppColors.grey),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () {
+              setState(() {
+                _pendingOrderId = null;
+                _pendingOrderTotalPrice = null;
+                _pendingProductId = null;
+                _pendingProductName = null;
+                _pendingProductImageUrl = null;
+              });
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -332,6 +499,10 @@ class _AdminChatDetailScreenState extends State<AdminChatDetailScreen> {
                     },
                   ),
           ),
+
+          // Thẻ đính kèm chờ gửi (nếu có)
+          if (_pendingOrderId != null || _pendingProductId != null)
+            _buildPendingAttachmentPreview(),
 
           // Khung nhập tin nhắn
           Container(
@@ -448,7 +619,148 @@ class _AdminChatDetailScreenState extends State<AdminChatDetailScreen> {
                   ),
                 ],
               ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
+
+            // THẺ ĐÍNH KÈM ĐƠN HÀNG (NẾU CÓ)
+            if (msg.hasOrderAttachment) ...[
+              InkWell(
+                onTap: () => _navigateToOrder(msg.orderId!),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  margin: const EdgeInsets.only(bottom: 6),
+                  decoration: BoxDecoration(
+                    color: isShop
+                        ? Colors.white.withValues(alpha: 0.12)
+                        : AppColors.ultraLightGrey,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isShop ? Colors.white24 : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.receipt_long,
+                        size: 20,
+                        color: isShop ? Colors.white : AppColors.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Đơn hàng #${msg.orderId!.length > 8 ? msg.orderId!.substring(0, 8) : msg.orderId}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: isShop ? Colors.white : AppColors.textPrimary,
+                              ),
+                            ),
+                            if (msg.orderTotalPrice != null)
+                              Text(
+                                AppFormatters.formatCurrency(
+                                  msg.orderTotalPrice!,
+                                ),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: isShop
+                                      ? Colors.white70
+                                      : AppColors.primary,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: 12,
+                        color: isShop ? Colors.white60 : Colors.grey,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+
+            // THẺ ĐÍNH KÈM SẢN PHẨM (NẾU CÓ)
+            if (msg.hasProductAttachment) ...[
+              InkWell(
+                onTap: () =>
+                    _navigateToProduct(msg.productId, msg.productName),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  margin: const EdgeInsets.only(bottom: 6),
+                  decoration: BoxDecoration(
+                    color: isShop
+                        ? Colors.white.withValues(alpha: 0.12)
+                        : AppColors.ultraLightGrey,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isShop ? Colors.white24 : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (msg.productImageUrl != null &&
+                          msg.productImageUrl!.isNotEmpty)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: CachedNetworkImage(
+                            imageUrl: msg.productImageUrl!,
+                            width: 38,
+                            height: 38,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(
+                              width: 38,
+                              height: 38,
+                              color: Colors.grey.shade200,
+                            ),
+                            errorWidget: (_, __, ___) => Container(
+                              width: 38,
+                              height: 38,
+                              color: Colors.grey.shade300,
+                              child: const Icon(Icons.broken_image, size: 18),
+                            ),
+                          ),
+                        )
+                      else
+                        Icon(
+                          Icons.checkroom,
+                          size: 22,
+                          color: isShop ? Colors.white : AppColors.primary,
+                        ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          msg.productName ?? 'Sản phẩm thời trang',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isShop ? Colors.white : AppColors.textPrimary,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: 12,
+                        color: isShop ? Colors.white60 : Colors.grey,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+
             Text(
               msg.text,
               style: TextStyle(
