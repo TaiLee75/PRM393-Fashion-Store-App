@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/app_image.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/cart_item_model.dart';
 import '../../models/product_model.dart';
@@ -109,16 +109,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     itemCount: product.imageUrls.length,
                     onPageChanged: (index) => setState(() => _currentImageIndex = index),
                     itemBuilder: (context, index) {
-                      return CachedNetworkImage(
+                      return AppImage(
                         imageUrl: product.imageUrls[index],
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
-                          color: AppColors.ultraLightGrey,
-                          child: const Center(
-                            child: CircularProgressIndicator(color: AppColors.primary),
-                          ),
-                        ),
-                        errorWidget: (_, __, ___) => const Icon(Icons.image_not_supported),
                       );
                     },
                   ),
@@ -521,13 +514,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       children: [
                                         ClipRRect(
                                           borderRadius: BorderRadius.circular(4),
-                                          child: CachedNetworkImage(
+                                          child: AppImage(
                                             imageUrl: sp.mainImage,
                                             width: 110,
                                             height: 110,
                                             fit: BoxFit.cover,
-                                            placeholder: (_, __) => Container(color: AppColors.ultraLightGrey),
-                                            errorWidget: (_, __, ___) => const Icon(Icons.image_not_supported),
                                           ),
                                         ),
                                         const SizedBox(height: 6),
@@ -578,23 +569,40 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ],
         ),
         child: SafeArea(
-          child: variantStock <= 0
+          child: !product.isActive
               ? SizedBox(
                   height: 48,
                   child: ElevatedButton(
                     onPressed: null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade300,
-                      foregroundColor: Colors.grey.shade600,
+                      backgroundColor: Colors.red.shade50,
+                      disabledBackgroundColor: Colors.red.shade100,
+                      disabledForegroundColor: Colors.red.shade800,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                     ),
                     child: const Text(
-                      'HẾT HÀNG PHÂN LOẠI NÀY',
+                      'SẢN PHẨM TẠM NGỪNG KINH DOANH',
                       style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8),
                     ),
                   ),
                 )
-              : Row(
+              : variantStock <= 0
+                  ? SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey.shade300,
+                          foregroundColor: Colors.grey.shade600,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        ),
+                        child: const Text(
+                          'HẾT HÀNG PHÂN LOẠI NÀY',
+                          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                        ),
+                      ),
+                    )
+                  : Row(
                   children: [
                     // Nút THÊM VÀO GIỎ HÀNG
                     Expanded(

@@ -10,6 +10,7 @@ import 'providers/order_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/chat_provider.dart';
 import 'services/firestore_service.dart';
+import 'screens/admin/shop_admin_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/main_nav_screen.dart';
 
@@ -98,11 +99,14 @@ class MyApp extends StatelessWidget {
         ),
         home: Consumer<AuthProvider>(
           builder: (context, auth, _) {
-            // Nếu đã đăng nhập thành công thì vào thẳng MainNavScreen, ngược lại hiển thị LoginScreen
-            if (auth.isAuthenticated) {
-              return MainNavScreen(key: ValueKey(auth.userId));
+            if (!auth.isAuthenticated) {
+              return const LoginScreen();
             }
-            return const LoginScreen();
+            // Tách bạch tuyệt đối luồng trải nghiệm: Admin vào ShopAdminScreen, Khách vào MainNavScreen
+            if (auth.isAdmin) {
+              return const ShopAdminScreen();
+            }
+            return MainNavScreen(key: ValueKey(auth.userId));
           },
         ),
       ),

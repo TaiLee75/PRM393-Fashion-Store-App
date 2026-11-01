@@ -29,6 +29,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _weightController;
 
   bool _isSaving = false;
+  double? _defaultLatitude;
+  double? _defaultLongitude;
 
   // Danh sách các Avatar mẫu phong cách thời trang tối giản (Unsplash CDN)
   static const List<String> _presetAvatars = [
@@ -54,6 +56,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _addressController =
         TextEditingController(text: user?.defaultAddress ?? '');
     _avatarUrlController = TextEditingController(text: user?.avatarUrl ?? '');
+    _defaultLatitude = user?.defaultLatitude;
+    _defaultLongitude = user?.defaultLongitude;
 
     // Khởi tạo số đo cơ thể nếu có
     final savedHeight = user?.savedHeight;
@@ -93,6 +97,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       fullName: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
       defaultAddress: _addressController.text.trim(),
+      defaultLatitude: _defaultLatitude,
+      defaultLongitude: _defaultLongitude,
       avatarUrl: _avatarUrlController.text.trim(),
     );
 
@@ -180,10 +186,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (pickedAddress != null && pickedAddress.isNotEmpty) {
         setState(() {
           _addressController.text = pickedAddress;
+          if (res is Map) {
+            _defaultLatitude = (res['latitude'] as num?)?.toDouble();
+            _defaultLongitude = (res['longitude'] as num?)?.toDouble();
+          }
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('📍 Đã cập nhật địa chỉ từ Bản đồ OpenStreetMap!'),
+            content: Text('📍 Đã cập nhật địa chỉ và tọa độ ghim từ Bản đồ!'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -762,6 +772,8 @@ class _AddAddressDialogState extends State<_AddAddressDialog> {
   late final TextEditingController _recipientNameCtrl;
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _addressCtrl;
+  double? _latitude;
+  double? _longitude;
   bool _isDefault = false;
 
   @override
@@ -794,6 +806,10 @@ class _AddAddressDialogState extends State<_AddAddressDialog> {
       if (pickedAddress != null && pickedAddress.isNotEmpty) {
         setState(() {
           _addressCtrl.text = pickedAddress;
+          if (res is Map) {
+            _latitude = (res['latitude'] as num?)?.toDouble();
+            _longitude = (res['longitude'] as num?)?.toDouble();
+          }
         });
       }
     }
@@ -806,6 +822,8 @@ class _AddAddressDialogState extends State<_AddAddressDialog> {
         'recipientName': _recipientNameCtrl.text.trim(),
         'phone': AppValidators.normalizePhone(_phoneCtrl.text.trim()),
         'address': _addressCtrl.text.trim(),
+        'latitude': _latitude,
+        'longitude': _longitude,
         'isDefault': _isDefault,
       };
       Navigator.of(context).pop(data);

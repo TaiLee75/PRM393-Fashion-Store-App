@@ -60,6 +60,10 @@ class AuthProvider extends ChangeNotifier {
   Map<String, num>? get bodyMeasurements => _userModel?.bodyMeasurements;
   String get effectiveDefaultAddress =>
       _userModel?.effectiveDefaultAddress ?? '';
+  double? get effectiveDefaultLatitude =>
+      _userModel?.effectiveDefaultLatitude;
+  double? get effectiveDefaultLongitude =>
+      _userModel?.effectiveDefaultLongitude;
   String get effectiveRecipientName =>
       _userModel?.effectiveRecipientName ?? userFullName;
   String get effectivePhone =>
@@ -554,11 +558,13 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Cập nhật thông tin cá nhân cơ bản (Họ tên, SĐT, Địa chỉ mặc định, Avatar)
+  /// Cập nhật thông tin cá nhân cơ bản (Họ tên, SĐT, Địa chỉ mặc định, Tọa độ mặc định, Avatar)
   Future<bool> updateProfile({
     String? fullName,
     String? phone,
     String? defaultAddress,
+    double? defaultLatitude,
+    double? defaultLongitude,
     String? avatarUrl,
   }) async {
     if (_userModel == null) return false;
@@ -588,6 +594,8 @@ class AuthProvider extends ChangeNotifier {
         fullName: fullName ?? _userModel!.fullName,
         phone: cleanPhoneToSave ?? _userModel!.phone,
         defaultAddress: defaultAddress ?? _userModel!.defaultAddress,
+        defaultLatitude: defaultLatitude ?? _userModel!.defaultLatitude,
+        defaultLongitude: defaultLongitude ?? _userModel!.defaultLongitude,
         avatarUrl: avatarUrl ?? _userModel!.avatarUrl,
       );
       await _firestoreService.saveUser(updated);

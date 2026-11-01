@@ -4,12 +4,14 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/app_validators.dart';
 import '../../core/utils/formatters.dart';
+import '../../models/branch_model.dart';
 import '../../models/cart_item_model.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/product_provider.dart';
+import '../../services/firestore_service.dart';
 import '../main_nav_screen.dart';
 import '../map/store_map_screen.dart';
 import 'widgets/vietqr_dialog.dart';
@@ -29,6 +31,10 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
+  late final Stream<List<BranchModel>> _branchesStream =
+      _firestoreService.streamBranches();
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -42,6 +48,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _appliedVoucher = '';
   bool _saveAsDefaultAddress = false;
   bool _isSubmitting = false;
+  double? _shippingLatitude;
+  double? _shippingLongitude;
 
   @override
   void initState() {
@@ -52,6 +60,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _addressController.text = auth.effectiveDefaultAddress.isNotEmpty
         ? auth.effectiveDefaultAddress
         : (auth.userModel?.defaultAddress ?? '');
+    _shippingLatitude = auth.effectiveDefaultLatitude;
+    _shippingLongitude = auth.effectiveDefaultLongitude;
 
     // Nếu vào từ giỏ hàng đã có voucher trước đó
     if (widget.directBuyItems == null) {
@@ -206,6 +216,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           _nameController.text = primaryName;
                           _phoneController.text = primaryPhone;
                           _addressController.text = primaryAddress;
+                          _shippingLatitude = user?.defaultLatitude;
+                          _shippingLongitude = user?.defaultLongitude;
                         });
                         Navigator.pop(ctx);
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -338,6 +350,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   _phoneController.text = phone.trim();
                                 }
                                 _addressController.text = address.trim();
+                                _shippingLatitude = (item['latitude'] as num?)?.toDouble();
+                                _shippingLongitude = (item['longitude'] as num?)?.toDouble();
                               });
                               Navigator.pop(ctx);
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -552,6 +566,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         userName: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
         shippingAddress: shippingAddress,
+        shippingLatitude: _deliveryMethod == 'DELIVERY' ? _shippingLatitude : null,
+        shippingLongitude: _deliveryMethod == 'DELIVERY' ? _shippingLongitude : null,
         deliveryMethod: _deliveryMethod,
         pickupBranchName: _deliveryMethod == 'PICKUP' ? _selectedBranch : '',
         note: _noteController.text.trim(),
@@ -572,6 +588,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           fullName: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
           defaultAddress: _addressController.text.trim(),
+          defaultLatitude: _shippingLatitude,
+          defaultLongitude: _shippingLongitude,
         );
       }
 
@@ -941,6 +959,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 if (selectedAddr != null && selectedAddr.isNotEmpty) {
                                   setState(() {
                                     _addressController.text = selectedAddr;
+                                    if (result is Map) {
+                                      _shippingLatitude = (result['latitude'] as num?)?.toDouble();
+                                      _shippingLongitude = (result['longitude'] as num?)?.toDouble();
+                                    }
                                   });
                                 }
                               }
@@ -972,28 +994,79 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedBranch,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        prefixIcon: Icon(Icons.storefront, size: 20),
-                      ),
-                      items: AppConstants.storeBranches.map((branch) {
-                        final name = branch['name'] as String;
-                        final address = branch['address'] as String;
-                        return DropdownMenuItem<String>(
-                          value: name,
-                          child: Text(
-                            '$name - $address',
-                            style: const TextStyle(fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
+                    StreamBuilder<List<BranchModel>>(
+                      stream: _branchesStream,
+                      builder: (context, snapshot) {
+                        List<BranchModel> activeBranches = [];
+                        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                          activeBranches = snapshot.data!.where((b) => b.isActive).toList();
+                        } else {
+                          activeBranches = AppConstants.storeBranches.map((b) {
+                            return BranchModel(
+                              id: b['name'] as String,
+                              name: b['name'] as String,
+                              address: b['address'] as String,
+                              latitude: 15.9689,
+                              longitude: 108.2608,
+                              isActive: true,
+                              createdAt: DateTime.now(),
+                            );
+                          }).toList();
+                        }
+
+                        if (activeBranches.isEmpty) {
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.orange.shade200),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Hiện tại các chi nhánh đều đang tạm ngừng đón khách. Quý khách vui lòng chọn hình thức Giao tận nơi!',
+                                    style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        // Đảm bảo _selectedBranch luôn trỏ vào 1 chi nhánh đang hoạt động hợp lệ
+                        final branchExists = activeBranches.any((b) => b.name == _selectedBranch);
+                        final effectiveSelected = branchExists ? _selectedBranch : activeBranches.first.name;
+                        if (!branchExists) {
+                          _selectedBranch = effectiveSelected;
+                        }
+
+                        return DropdownButtonFormField<String>(
+                          key: ValueKey(effectiveSelected),
+                          initialValue: effectiveSelected,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            prefixIcon: Icon(Icons.storefront, size: 20),
                           ),
+                          items: activeBranches.map((branch) {
+                            return DropdownMenuItem<String>(
+                              value: branch.name,
+                              child: Text(
+                                '${branch.name} - ${branch.address}',
+                                style: const TextStyle(fontSize: 12),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _selectedBranch = val);
+                          },
                         );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setState(() => _selectedBranch = val);
                       },
                     ),
                     const SizedBox(height: 12),

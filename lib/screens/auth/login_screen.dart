@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
+import '../admin/shop_admin_screen.dart';
 import '../main_nav_screen.dart';
 
 /// Màn hình Đăng nhập phong cách Uniqlo tối giản, hiện đại
@@ -37,8 +38,9 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
+      final target = authProvider.isAdmin ? const ShopAdminScreen() : const MainNavScreen();
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MainNavScreen()),
+        MaterialPageRoute(builder: (_) => target),
         (route) => false,
       );
     } else if (mounted && authProvider.errorMessage != null) {
@@ -102,8 +104,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await authProvider.signInWithGoogle();
 
     if (success && mounted) {
+      final target = authProvider.isAdmin ? const ShopAdminScreen() : const MainNavScreen();
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MainNavScreen()),
+        MaterialPageRoute(builder: (_) => target),
         (route) => false,
       );
     } else if (mounted && authProvider.errorMessage != null) {

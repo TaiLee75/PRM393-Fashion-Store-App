@@ -9,6 +9,7 @@ class BranchModel {
   final double latitude;
   final double longitude;
   final String phone;
+  final bool isActive;
   final DateTime createdAt;
 
   const BranchModel({
@@ -18,6 +19,7 @@ class BranchModel {
     required this.latitude,
     required this.longitude,
     this.phone = '1900 1234',
+    this.isActive = true,
     required this.createdAt,
   });
 
@@ -39,6 +41,7 @@ class BranchModel {
       latitude: (map['latitude'] as num?)?.toDouble() ?? 15.9689,
       longitude: (map['longitude'] as num?)?.toDouble() ?? 108.2608,
       phone: map['phone'] as String? ?? '1900 1234',
+      isActive: map['isActive'] as bool? ?? true,
       createdAt: parseDate(map['createdAt']),
     );
   }
@@ -51,6 +54,7 @@ class BranchModel {
       'latitude': latitude,
       'longitude': longitude,
       'phone': phone,
+      'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
@@ -62,6 +66,7 @@ class BranchModel {
     double? latitude,
     double? longitude,
     String? phone,
+    bool? isActive,
     DateTime? createdAt,
   }) {
     return BranchModel(
@@ -71,6 +76,7 @@ class BranchModel {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       phone: phone ?? this.phone,
+      isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
     );
   }

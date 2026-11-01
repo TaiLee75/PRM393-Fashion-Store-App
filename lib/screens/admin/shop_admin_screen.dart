@@ -3,14 +3,20 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/app_image.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/cart_item_model.dart';
 import '../../models/order_model.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/cart_provider.dart';
+import '../../providers/chat_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../services/firestore_service.dart';
+import '../auth/login_screen.dart';
+import '../map/store_map_screen.dart';
 import '../orders/order_detail_screen.dart';
 import 'admin_branch_management_screen.dart';
 import 'admin_chat_inbox_screen.dart';
@@ -31,7 +37,8 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
   String _adminOrderFilter = 'ALL';
   final TextEditingController _adminOrderSearchController = TextEditingController();
   String _adminOrderQuery = '';
-  String _selectedTimeRange = 'ALL_TIME'; // 'TODAY', 'LAST_7_DAYS', 'LAST_30_DAYS', 'ALL_TIME'
+  String _selectedTimeRange = 'ALL_TIME'; // 'TODAY', 'LAST_7_DAYS', 'LAST_30_DAYS', 'ALL_TIME', 'CUSTOM'
+  DateTimeRange? _customDateRange;
 
   @override
   void initState() {
@@ -106,6 +113,60 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
             letterSpacing: 1.1,
           ),
         ),
+        actions: [
+          // 1. Hộp thư CSKH với Badge số lượng tin nhắn chưa đọc (An toàn môi trường Test)
+          Builder(
+            builder: (ctx) {
+              final chatProvider = ctx.watch<ChatProvider?>();
+              final unread = chatProvider?.unreadAdminTotal ?? 0;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.mark_chat_unread_outlined, color: Colors.white),
+                    tooltip: 'Hộp thư CSKH & Tư vấn',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AdminChatInboxScreen()),
+                      );
+                    },
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          '$unread',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+
+          // 2. Nút Đăng xuất Admin
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white70),
+            tooltip: 'Đăng xuất Admin',
+            onPressed: () => _handleAdminLogout(context, authProvider),
+          ),
+          const SizedBox(width: 4),
+        ],
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
@@ -159,6 +220,22 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
           return !date.isBefore(sevenDaysStart);
         case 'LAST_30_DAYS':
           return !date.isBefore(thirtyDaysStart);
+        case 'CUSTOM':
+          if (_customDateRange == null) return true;
+          final startDay = DateTime(
+            _customDateRange!.start.year,
+            _customDateRange!.start.month,
+            _customDateRange!.start.day,
+          );
+          final endDay = DateTime(
+            _customDateRange!.end.year,
+            _customDateRange!.end.month,
+            _customDateRange!.end.day,
+            23,
+            59,
+            59,
+          );
+          return !date.isBefore(startDay) && !date.isAfter(endDay);
         default:
           return true;
       }
@@ -416,7 +493,9 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                         ? '7 ngày qua'
                         : _selectedTimeRange == 'LAST_30_DAYS'
                             ? '30 ngày qua'
-                            : 'Tất cả đơn',
+                            : _selectedTimeRange == 'CUSTOM' && _customDateRange != null
+                                ? '${_customDateRange!.start.day}/${_customDateRange!.start.month} - ${_customDateRange!.end.day}/${_customDateRange!.end.month}'
+                                : 'Tất cả đơn',
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
@@ -429,47 +508,114 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: ranges.map((r) {
-                final isSelected = _selectedTimeRange == r['key'];
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: InkWell(
-                    onTap: () {
-                      setState(() => _selectedTimeRange = r['key'] as String);
-                    },
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppColors.black : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isSelected ? AppColors.black : Colors.grey.shade300,
+              children: [
+                ...ranges.map((r) {
+                  final isSelected = _selectedTimeRange == r['key'];
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() => _selectedTimeRange = r['key'] as String);
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.black : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSelected ? AppColors.black : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              r['icon'] as IconData,
+                              size: 13,
+                              color: isSelected ? Colors.white : AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              r['label'] as String,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                color: isSelected ? Colors.white : AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            r['icon'] as IconData,
-                            size: 13,
-                            color: isSelected ? Colors.white : AppColors.textSecondary,
+                    ),
+                  );
+                }),
+                // Nút chọn khoảng ngày tùy chỉnh (Custom Date Range Picker)
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDateRangePicker(
+                      context: context,
+                      firstDate: DateTime(2023),
+                      lastDate: DateTime.now().add(const Duration(days: 1)),
+                      initialDateRange: _customDateRange ??
+                          DateTimeRange(
+                            start: DateTime.now().subtract(const Duration(days: 7)),
+                            end: DateTime.now(),
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            r['label'] as String,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              color: isSelected ? Colors.white : AppColors.textPrimary,
+                      builder: (context, child) {
+                        return Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: const ColorScheme.light(
+                              primary: AppColors.black,
+                              onPrimary: AppColors.white,
+                              onSurface: AppColors.black,
                             ),
                           ),
-                        ],
+                          child: child!,
+                        );
+                      },
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _customDateRange = picked;
+                        _selectedTimeRange = 'CUSTOM';
+                      });
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _selectedTimeRange == 'CUSTOM' ? AppColors.black : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _selectedTimeRange == 'CUSTOM' ? AppColors.black : Colors.grey.shade300,
                       ),
                     ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.date_range,
+                          size: 13,
+                          color: _selectedTimeRange == 'CUSTOM' ? Colors.white : AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _selectedTimeRange == 'CUSTOM' && _customDateRange != null
+                              ? '${_customDateRange!.start.day}/${_customDateRange!.start.month} - ${_customDateRange!.end.day}/${_customDateRange!.end.month}'
+                              : 'Chọn ngày...',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: _selectedTimeRange == 'CUSTOM' ? FontWeight.bold : FontWeight.w500,
+                            color: _selectedTimeRange == 'CUSTOM' ? Colors.white : AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                );
-              }).toList(),
+                ),
+              ],
             ),
           ),
         ],
@@ -511,32 +657,39 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.insights_rounded,
+                          color: Color(0xFF10B981),
+                          size: 20,
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.insights_rounded,
-                        color: Color(0xFF10B981),
-                        size: 20,
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'DOANH THU THỰC THU (NET REVENUE)',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                            color: Colors.white70,
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'DOANH THU THỰC THU (NET REVENUE)',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
@@ -1129,23 +1282,11 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: product.mainImage.isNotEmpty
-                          ? CachedNetworkImage(
+                          ? AppImage(
                               imageUrl: product.mainImage,
                               width: 38,
                               height: 38,
                               fit: BoxFit.cover,
-                              placeholder: (_, __) => Container(
-                                width: 38,
-                                height: 38,
-                                color: AppColors.ultraLightGrey,
-                                child: const Icon(Icons.image, size: 18, color: Colors.grey),
-                              ),
-                              errorWidget: (_, __, ___) => Container(
-                                width: 38,
-                                height: 38,
-                                color: AppColors.ultraLightGrey,
-                                child: const Icon(Icons.image_not_supported, size: 18, color: Colors.grey),
-                              ),
                             )
                           : Container(
                               width: 38,
@@ -2135,8 +2276,8 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                     const SizedBox(width: 8),
                     ElevatedButton.icon(
                       onPressed: () => _handleAdminApproveDelivery(order, orderProvider),
-                      icon: const Icon(Icons.local_shipping_outlined, size: 16),
-                      label: const Text('Duyệt giao hàng'),
+                      icon: Icon(order.isPickup ? Icons.storefront : Icons.local_shipping_outlined, size: 16),
+                      label: Text(order.isPickup ? 'Chuẩn bị xong' : 'Duyệt giao hàng'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue.shade700,
                         foregroundColor: Colors.white,
@@ -2150,10 +2291,11 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                         final confirm = await showDialog<bool>(
                           context: context,
                           builder: (ctx) => AlertDialog(
-                            title: const Text('Xác nhận giao hàng'),
+                            title: Text(order.isPickup ? 'Xác nhận khách đã lấy hàng' : 'Xác nhận giao hàng'),
                             content: Text(
-                              'Xác nhận đơn hàng #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId} đã được giao thành công cho khách hàng?\n'
-                              'Hệ thống sẽ tự động cập nhật trạng thái thanh toán sang "Paid".',
+                              order.isPickup
+                                  ? 'Xác nhận khách hàng đã đến lấy đơn hàng #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId} tại quầy?\nHệ thống sẽ tự động cập nhật trạng thái thanh toán sang "Paid".'
+                                  : 'Xác nhận đơn hàng #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId} đã được giao thành công cho khách hàng?\nHệ thống sẽ tự động cập nhật trạng thái thanh toán sang "Paid".',
                             ),
                             actions: [
                               TextButton(
@@ -2163,7 +2305,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                               ElevatedButton(
                                 onPressed: () => Navigator.pop(ctx, true),
                                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
-                                child: const Text('Xác nhận đã giao', style: TextStyle(color: Colors.white)),
+                                child: Text(order.isPickup ? 'Xác nhận đã lấy' : 'Xác nhận đã giao', style: const TextStyle(color: Colors.white)),
                               ),
                             ],
                           ),
@@ -2178,15 +2320,15 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(success
-                                  ? 'Đơn hàng đã được giao thành công!'
+                                  ? (order.isPickup ? 'Khách đã lấy hàng thành công!' : 'Đơn hàng đã được giao thành công!')
                                   : 'Cập nhật thất bại: ${orderProvider.errorMessage}'),
                               backgroundColor: success ? AppColors.success : Colors.red,
                             ),
                           );
                         }
                       },
-                      icon: const Icon(Icons.check_circle_outline, size: 16),
-                      label: const Text('Xác nhận đã giao'),
+                      icon: Icon(order.isPickup ? Icons.storefront : Icons.check_circle_outline, size: 16),
+                      label: Text(order.isPickup ? 'Khách đã lấy' : 'Xác nhận đã giao'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.success,
                         foregroundColor: Colors.white,
@@ -2271,14 +2413,11 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
             height: 44,
             color: Colors.grey.shade200,
             child: item.imageUrl.isNotEmpty
-                ? CachedNetworkImage(
+                ? AppImage(
                     imageUrl: item.imageUrl,
+                    width: 44,
+                    height: 44,
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => const Icon(
-                      Icons.image_not_supported_outlined,
-                      size: 20,
-                      color: Colors.grey,
-                    ),
                   )
                 : const Icon(Icons.shopping_bag_outlined, size: 20, color: Colors.grey),
           ),
@@ -2410,7 +2549,9 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(success
-            ? 'Đã duyệt chuyển đơn #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId} sang Đang giao hàng'
+            ? (order.isPickup
+                ? 'Đã duyệt chuyển đơn #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId} sang Sẵn sàng nhận'
+                : 'Đã duyệt chuyển đơn #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId} sang Đang giao hàng')
             : 'Lỗi cập nhật: ${orderProvider.errorMessage}'),
         backgroundColor: success ? Colors.blue.shade700 : Colors.red,
       ),
@@ -2937,8 +3078,145 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
               ],
             ),
           ),
+
+          const SizedBox(height: 20),
+
+          // Các phân hệ quản trị hệ thống
+          const Text(
+            'PHÂN HỆ TRUY CẬP NHANH',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.1,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          _buildNavigationCard(
+            title: 'Hộp Thư CSKH & Tư Vấn Khách Hàng',
+            subtitle: 'Phản hồi tin nhắn trực tiếp với khách mua hàng trên toàn hệ thống',
+            icon: Icons.chat_bubble_outline,
+            iconColor: Colors.deepOrange,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminChatInboxScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+
+          _buildNavigationCard(
+            title: 'Quản Lý Kho Hàng & Sản Phẩm',
+            subtitle: 'Thêm mới, sửa thông tin, bảng size, màu sắc & tồn kho SKU',
+            icon: Icons.app_registration,
+            iconColor: AppColors.primary,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminProductListScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+
+          _buildNavigationCard(
+            title: 'Quản Lý Chi Nhánh & Ghim Bản Đồ',
+            subtitle: 'Quản lý danh sách showroom & ghim vị trí OpenStreetMap',
+            icon: Icons.store_mall_directory,
+            iconColor: Colors.teal.shade800,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminBranchManagementScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+
+          _buildNavigationCard(
+            title: 'Bản Đồ Hệ Thống Cửa Hàng (Viewer)',
+            subtitle: 'Xem toàn bộ chi nhánh và vị trí trên OpenStreetMap',
+            icon: Icons.map_outlined,
+            iconColor: Colors.blue.shade700,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const StoreMapScreen()),
+              );
+            },
+          ),
+
+          const SizedBox(height: 24),
+
+          // Nút Đăng Xuất Admin
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _handleAdminLogout(context, authProvider),
+              icon: const Icon(Icons.logout, color: AppColors.error),
+              label: const Text(
+                'ĐĂNG XUẤT KHỎI TÀI KHOẢN ADMIN',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.error,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.error),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _handleAdminLogout(BuildContext context, AuthProvider authProvider) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Đăng xuất Admin', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('Bạn có chắc chắn muốn đăng xuất khỏi tài khoản Quản trị viên?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('HỦY', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('ĐĂNG XUẤT'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final cartProv = context.read<CartProvider?>();
+      final orderProv = context.read<OrderProvider?>();
+      final notiProv = context.read<NotificationProvider?>();
+      final chatProv = context.read<ChatProvider?>();
+
+      cartProv?.unloadCartOnLogout();
+      orderProv?.resetSession();
+      notiProv?.resetSession();
+      chatProv?.resetSession();
+
+      await authProvider.signOut();
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    }
   }
 }
