@@ -9,6 +9,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/product_provider.dart';
 import '../cart/checkout_screen.dart';
+import '../chat/chat_screen.dart';
 
 /// Màn hình Chi tiết sản phẩm: Chọn Size/Màu, Thêm vào giỏ & Viết Review
 class ProductDetailScreen extends StatefulWidget {
@@ -75,6 +76,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline, color: AppColors.black),
+            tooltip: 'Chat tư vấn về sản phẩm',
+            onPressed: () => _openChatWithProduct(product),
+          ),
           IconButton(
             icon: Icon(
               isFav ? Icons.favorite : Icons.favorite_border,
@@ -570,40 +576,58 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
         child: SafeArea(
           child: !product.isActive
-              ? SizedBox(
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade50,
-                      disabledBackgroundColor: Colors.red.shade100,
-                      disabledForegroundColor: Colors.red.shade800,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                    ),
-                    child: const Text(
-                      'SẢN PHẨM TẠM NGỪNG KINH DOANH',
-                      style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8),
-                    ),
-                  ),
-                )
-              : variantStock <= 0
-                  ? SizedBox(
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey.shade300,
-                          foregroundColor: Colors.grey.shade600,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                        ),
-                        child: const Text(
-                          'HẾT HÀNG PHÂN LOẠI NÀY',
-                          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8),
+              ? Row(
+                  children: [
+                    _buildChatButton(product),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SizedBox(
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade50,
+                            disabledBackgroundColor: Colors.red.shade100,
+                            disabledForegroundColor: Colors.red.shade800,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          ),
+                          child: const Text(
+                            'SẢN PHẨM TẠM NGỪNG KINH DOANH',
+                            style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                          ),
                         ),
                       ),
+                    ),
+                  ],
+                )
+              : variantStock <= 0
+                  ? Row(
+                      children: [
+                        _buildChatButton(product),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.grey.shade300,
+                                foregroundColor: Colors.grey.shade600,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                              ),
+                              child: const Text(
+                                'HẾT HÀNG PHÂN LOẠI NÀY',
+                                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     )
                   : Row(
                   children: [
+                    _buildChatButton(product),
+                    const SizedBox(width: 10),
                     // Nút THÊM VÀO GIỎ HÀNG
                     Expanded(
                       flex: 1,
@@ -719,6 +743,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ],
                 ),
         ),
+      ),
+    );
+  }
+
+  void _openChatWithProduct(ProductModel product) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          isStandalone: true,
+          initialProductId: product.id,
+          initialProductName: product.name,
+          initialProductImageUrl: product.mainImage,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatButton(ProductModel product) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        border: Border.all(color: Colors.grey.shade300, width: 1.2),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: IconButton(
+        icon: const Icon(
+          Icons.chat_bubble_outline,
+          color: AppColors.textPrimary,
+          size: 22,
+        ),
+        tooltip: 'Chat tư vấn về sản phẩm này',
+        onPressed: () => _openChatWithProduct(product),
       ),
     );
   }
