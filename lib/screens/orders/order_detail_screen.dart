@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/utils/app_image.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
@@ -338,6 +338,36 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   /// 6b. Admin duyệt giao hàng cho đơn vị vận chuyển
   Future<void> _handleAdminApproveDelivery(OrderModel order) async {
+    if (order.isVietQr && !order.isPaid) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Cảnh báo VietQR', style: TextStyle(fontSize: 16)),
+            ],
+          ),
+          content: Text(
+            'Đơn hàng #${order.orderId.length > 8 ? order.orderId.substring(0, 8) : order.orderId} chọn thanh toán VietQR nhưng chưa được xác nhận thanh toán (Trạng thái: ${order.paymentStatus}).\n\nBạn có chắc chắn muốn duyệt giao hàng ngay không?',
+            style: const TextStyle(fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Quay lại đối soát'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700),
+              child: const Text('Vẫn duyệt giao', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true || !mounted) return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1749,7 +1779,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
-                    child: CachedNetworkImage(
+                    child: AppImage(
                       imageUrl: item.imageUrl,
                       width: 52,
                       height: 52,

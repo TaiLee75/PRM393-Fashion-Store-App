@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/utils/app_image.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/formatters.dart';
@@ -513,7 +513,7 @@ class _CartScreenState extends State<CartScreen> {
           // Ảnh sản phẩm
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            child: CachedNetworkImage(
+            child: AppImage(
               imageUrl: item.imageUrl,
               width: 80,
               height: 80,

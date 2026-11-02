@@ -1,5 +1,5 @@
 import 'dart:math';
-import 'package:cached_network_image/cached_network_image.dart';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
@@ -71,7 +71,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              '🎉 Khởi tạo dữ liệu mẫu thành công: Danh mục, Sản phẩm & Chi nhánh đã nạp lên Firestore!',
+              '🎉 Khởi tạo dữ liệu mẫu thành công: Danh mục, Sản phẩm & Chi nhánh đã sẵn sàng!',
             ),
             backgroundColor: AppColors.success,
             duration: Duration(seconds: 4),
@@ -388,7 +388,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
         _buildNavigationCard(
           title: 'Quản Lý Kho Hàng & Sản Phẩm',
           subtitle:
-              'Thêm mới, sửa thông tin, bảng size, màu sắc, tồn kho SKU & danh mục Firestore',
+              'Thêm mới, cập nhật thông tin, bảng size, màu sắc, tồn kho & danh mục sản phẩm',
           icon: Icons.app_registration,
           iconColor: AppColors.primary,
           onTap: () {
@@ -405,7 +405,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
         _buildNavigationCard(
           title: 'Duyệt Đơn Hàng & Vận Chuyển',
           subtitle:
-              'Xử lý trạng thái Pending -> Delivering -> Delivered, đối soát VietQR & Đổi/Trả hàng',
+              'Xác nhận đơn mới, giao vận, đối soát chuyển khoản VietQR & xử lý Đổi/Trả',
           icon: Icons.receipt_long,
           iconColor: Colors.blue.shade800,
           onTap: () {
@@ -419,7 +419,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
         _buildNavigationCard(
           title: 'Quản Lý Hệ Thống Chi Nhánh',
           subtitle:
-              'Thêm chi nhánh mới, cập nhật hotline, địa chỉ và ghim tọa độ OpenStreetMap',
+              'Thêm chi nhánh mới, cập nhật hotline, địa chỉ và vị trí cửa hàng trên bản đồ',
           icon: Icons.store_mall_directory,
           iconColor: Colors.teal.shade800,
           onTap: () {
@@ -766,7 +766,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                 SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    'Khóa Bẫy 5: Không tính đơn Hủy hoặc Hoàn trả • Chạm để xem danh sách',
+                    'Chỉ tính đơn Giao thành công (Không tính đơn Hủy/Hoàn trả) • Chạm để xem danh sách',
                     style: TextStyle(fontSize: 10.5, color: Colors.white54),
                   ),
                 ),
@@ -1008,7 +1008,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: product.mainImage.isNotEmpty
-                          ? CachedNetworkImage(
+                          ? AppImage(
                               imageUrl: product.mainImage,
                               width: 44,
                               height: 44,
@@ -1209,7 +1209,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                       ),
                     ),
                     Text(
-                      'Xếp hạng tự động theo tổng lượt bán (soldCount)',
+                      'Xếp hạng tự động theo tổng số lượng đã bán',
                       style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
                     ),
                   ],
@@ -2974,7 +2974,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Nạp tự động 4 danh mục, 8 sản phẩm thời trang và 2 chi nhánh cửa hàng lên Cloud Firestore chỉ với 1 click duy nhất.',
+                  'Khởi tạo nhanh bộ dữ liệu mẫu gồm 4 danh mục, 8 sản phẩm thời trang và 2 chi nhánh cửa hàng.',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -2998,7 +2998,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
                         : const Icon(Icons.flash_on, color: Colors.white),
                     label: Text(
                       _isSeeding
-                          ? 'Đang nạp dữ liệu lên Firestore...'
+                          ? 'Đang khởi tạo dữ liệu mẫu...'
                           : 'BẤM NẠP SEED DATA NGAY',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
@@ -3123,7 +3123,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
 
           _buildNavigationCard(
             title: 'Quản Lý Chi Nhánh & Ghim Bản Đồ',
-            subtitle: 'Quản lý danh sách showroom & ghim vị trí OpenStreetMap',
+            subtitle: 'Quản lý danh sách showroom & vị trí chi nhánh trên bản đồ',
             icon: Icons.store_mall_directory,
             iconColor: Colors.teal.shade800,
             onTap: () {
@@ -3137,7 +3137,7 @@ class _ShopAdminScreenState extends State<ShopAdminScreen>
 
           _buildNavigationCard(
             title: 'Bản Đồ Hệ Thống Cửa Hàng (Viewer)',
-            subtitle: 'Xem toàn bộ chi nhánh và vị trí trên OpenStreetMap',
+            subtitle: 'Xem toàn bộ hệ thống chi nhánh cửa hàng trên bản đồ',
             icon: Icons.map_outlined,
             iconColor: Colors.blue.shade700,
             onTap: () {

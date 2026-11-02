@@ -318,12 +318,12 @@ class ProfileScreen extends StatelessWidget {
           // 4. MENU DÀNH CHO SHOP ADMIN (ROUTE GUARD - CHỈ ADMIN MỚI THẤY)
           if (isAdmin) ...[
             _buildMenuSection(
-              title: 'KHU VỰC QUẢN TRỊ (DÀNH CHO SHOP ADMIN)',
+              title: 'KHU VỰC QUẢN TRỊ CỬA HÀNG',
               items: [
                 _MenuItem(
                   icon: Icons.admin_panel_settings_outlined,
                   iconColor: AppColors.primary,
-                  title: 'Shop Admin Management Portal',
+                  title: 'Trung tâm Quản lý Cửa hàng',
                   subtitle:
                       'Quản lý kho sản phẩm, duyệt đơn, chi nhánh & CSKH',
                   onTap: () {
@@ -360,9 +360,9 @@ class ProfileScreen extends StatelessWidget {
               _MenuItem(
                 icon: Icons.favorite_border_rounded,
                 iconColor: AppColors.primary,
-                title: 'Danh sách Yêu thích (Wishlist)',
+                title: 'Sản phẩm Yêu thích',
                 subtitle:
-                    '${authProvider.wishlistProductIds.length} sản phẩm đã thả tim',
+                    '${authProvider.wishlistProductIds.length} sản phẩm đã lưu',
                 onTap: () {
                   Navigator.push(
                     context,
@@ -402,7 +402,7 @@ class ProfileScreen extends StatelessWidget {
               ),
               _MenuItem(
                 icon: Icons.store_mall_directory_outlined,
-                title: 'Hệ thống chi nhánh (Bản đồ OpenStreetMap)',
+                title: 'Hệ thống cửa hàng & Chi nhánh',
                 onTap: () {
                   Navigator.push(
                     context,
@@ -417,12 +417,12 @@ class ProfileScreen extends StatelessWidget {
 
           // 7. THÔNG TIN HỌC PHẦN
           _buildMenuSection(
-            title: 'THÔNG TIN HỌC PHẦN',
+            title: 'THÔNG TIN ỨNG DỤNG',
             items: [
               _MenuItem(
                 icon: Icons.info_outline,
-                title: 'Đồ án PRM393 - Đại học FPT',
-                subtitle: 'Single-Brand Fashion Store (Lifewear Uniqlo Style)',
+                title: 'Về thương hiệu Lifewear Store',
+                subtitle: 'Thời trang tối giản chất lượng cao • Phiên bản 1.0.0',
                 onTap: () {},
               ),
             ],
