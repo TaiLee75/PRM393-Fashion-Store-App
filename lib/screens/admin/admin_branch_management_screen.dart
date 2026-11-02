@@ -40,7 +40,7 @@ class _AdminBranchManagementScreenState
     if (success == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('🎉 Đã thêm chi nhánh mới vào Firestore!'),
+          content: Text('🎉 Đã thêm chi nhánh mới thành công!'),
           backgroundColor: AppColors.success,
         ),
       );
@@ -218,7 +218,7 @@ class _AdminBranchManagementScreenState
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    'Chưa có chi nhánh nào trên Firestore\nBấm nút bên dưới để thêm mới!',
+                    'Chưa có chi nhánh nào trong hệ thống\nBấm nút bên dưới để thêm mới!',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: AppColors.textSecondary),
                   ),

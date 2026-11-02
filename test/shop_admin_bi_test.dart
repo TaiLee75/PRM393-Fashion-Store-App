@@ -346,7 +346,7 @@ void main() {
 
       // Khóa bẫy 5 ghi chú giải thích
       expect(
-        find.text('Khóa Bẫy 5: Không tính đơn Hủy hoặc Hoàn trả • Chạm để xem danh sách'),
+        find.text('Chỉ tính đơn Giao thành công (Không tính đơn Hủy/Hoàn trả) • Chạm để xem danh sách'),
         findsOneWidget,
       );
     });

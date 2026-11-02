@@ -291,7 +291,7 @@ class _AdminProductListScreenState extends State<AdminProductListScreen> {
 
                     // Danh sách danh mục hiện có
                     const Text(
-                      'Danh mục hiện hành trên Firestore:',
+                      'Danh mục hiện có:',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -1111,7 +1111,11 @@ class _QuickRestockDialogState extends State<_QuickRestockDialog> {
 
             // Cập nhật trạng thái isActive nếu có thay đổi
             if (_isActive != product.isActive) {
-              final updated = product.copyWith(isActive: _isActive);
+              final latestProduct = productProvider.allProducts
+                      .where((p) => p.id == product.id)
+                      .firstOrNull ??
+                  product;
+              final updated = latestProduct.copyWith(isActive: _isActive);
               await productProvider.updateProduct(updated);
             }
 

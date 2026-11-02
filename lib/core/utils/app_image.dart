@@ -10,6 +10,8 @@ class AppImage extends StatelessWidget {
   final double? height;
   final BoxFit fit;
   final BorderRadius? borderRadius;
+  final Widget Function(BuildContext, String)? placeholder;
+  final Widget Function(BuildContext, String, Object)? errorWidget;
 
   const AppImage({
     super.key,
@@ -18,6 +20,8 @@ class AppImage extends StatelessWidget {
     this.height,
     this.fit = BoxFit.cover,
     this.borderRadius,
+    this.placeholder,
+    this.errorWidget,
   });
 
   @override
@@ -34,20 +38,23 @@ class AppImage extends StatelessWidget {
           width: width,
           height: height,
           fit: fit,
-          errorBuilder: (_, __, ___) => Container(
-            width: width,
-            height: height,
-            color: AppColors.ultraLightGrey,
-            child: const Icon(Icons.broken_image, color: Colors.grey),
-          ),
+          errorBuilder: (ctx, err, _) =>
+              errorWidget?.call(ctx, cleanUrl, err) ??
+              Container(
+                width: width,
+                height: height,
+                color: AppColors.ultraLightGrey,
+                child: const Icon(Icons.broken_image, color: Colors.grey),
+              ),
         );
-      } catch (_) {
-        imageWidget = Container(
-          width: width,
-          height: height,
-          color: AppColors.ultraLightGrey,
-          child: const Icon(Icons.broken_image, color: Colors.grey),
-        );
+      } catch (err) {
+        imageWidget = errorWidget?.call(context, cleanUrl, err) ??
+            Container(
+              width: width,
+              height: height,
+              color: AppColors.ultraLightGrey,
+              child: const Icon(Icons.broken_image, color: Colors.grey),
+            );
       }
     } else if (cleanUrl.isNotEmpty) {
       imageWidget = CachedNetworkImage(
@@ -55,17 +62,20 @@ class AppImage extends StatelessWidget {
         width: width,
         height: height,
         fit: fit,
-        placeholder: (_, __) => Container(
-          width: width,
-          height: height,
-          color: AppColors.ultraLightGrey,
-        ),
-        errorWidget: (_, __, ___) => Container(
-          width: width,
-          height: height,
-          color: AppColors.ultraLightGrey,
-          child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
-        ),
+        placeholder: placeholder ??
+            (_, __) => Container(
+                  width: width,
+                  height: height,
+                  color: AppColors.ultraLightGrey,
+                ),
+        errorWidget: errorWidget ??
+            (_, __, ___) => Container(
+                  width: width,
+                  height: height,
+                  color: AppColors.ultraLightGrey,
+                  child: const Icon(Icons.image_not_supported_outlined,
+                      color: Colors.grey),
+                ),
       );
     } else {
       imageWidget = Container(

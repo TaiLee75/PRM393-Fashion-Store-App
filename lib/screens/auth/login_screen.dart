@@ -447,7 +447,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             SizedBox(width: 6),
                             Text(
-                              'ĐIỀN NHANH ĐỂ TEST (1 CHẠM)',
+                              'ĐĂNG NHẬP NHANH (TÀI KHOẢN MẪU)',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,

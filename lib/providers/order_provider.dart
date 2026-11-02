@@ -5,6 +5,7 @@ import '../core/constants/app_constants.dart';
 import '../models/cart_item_model.dart';
 import '../models/order_model.dart';
 import '../services/firestore_service.dart';
+import '../services/sepay_service.dart';
 
 /// ViewModel quản lý toàn bộ vòng đời đơn hàng chuẩn Enterprise (MVVM):
 /// - Quản lý 6 trạng thái vận hành: Pending -> Confirmed/Delivering -> Delivered -> Cancelled / ReturnRequested / Returned.
@@ -23,6 +24,8 @@ class OrderProvider extends ChangeNotifier {
 
   StreamSubscription<List<OrderModel>>? _userOrdersSub;
   StreamSubscription<List<OrderModel>>? _allOrdersSub;
+  Timer? _vietQrLifecycleTimer;
+  final Set<String> _processingVietQrIds = {};
 
   OrderProvider({FirestoreService? firestoreService})
       : _firestoreService = firestoreService ?? FirestoreService();
@@ -143,6 +146,8 @@ class OrderProvider extends ChangeNotifier {
         _isLoading = false;
         _errorMessage = null;
         notifyListeners();
+        _startVietQrLifecycleWatcher();
+        unawaited(_sweepAwaitingVietQrOrders());
       }, onError: (err) {
         _errorMessage = err.toString();
         _isLoading = false;
@@ -172,6 +177,8 @@ class OrderProvider extends ChangeNotifier {
         _isLoading = false;
         _errorMessage = null;
         notifyListeners();
+        _startVietQrLifecycleWatcher();
+        unawaited(_sweepAwaitingVietQrOrders());
       }, onError: (err) {
         _errorMessage = err.toString();
         _isLoading = false;
@@ -214,6 +221,9 @@ class OrderProvider extends ChangeNotifier {
     _userOrdersSub = null;
     _allOrdersSub?.cancel();
     _allOrdersSub = null;
+    _vietQrLifecycleTimer?.cancel();
+    _vietQrLifecycleTimer = null;
+    _processingVietQrIds.clear();
     _activeUserId = null;
     _userOrders = [];
     _allOrders = [];
@@ -392,16 +402,114 @@ class OrderProvider extends ChangeNotifier {
     });
   }
 
+  /// Hủy ngầm đơn quá hạn mà không bật cờ _isLoading toàn màn hình gây nháy UI
+  Future<bool> _cancelExpiredOrderSilently(String orderId) async {
+    const reason =
+        'Đơn hàng tự động hủy do quá hạn thanh toán (${AppConstants.unpaidOrderTimeoutMinutes} phút)';
+    try {
+      await _firestoreService.cancelOrder(
+        orderId,
+        cancelReason: reason,
+        cancelledBy: 'system',
+      );
+      try {
+        final latest = await _firestoreService.getOrderById(orderId);
+        if (latest != null) {
+          _updateLocalOrder(orderId, (_) => latest);
+        } else {
+          _fallbackLocalCancel(orderId, reason, 'system');
+        }
+      } catch (_) {
+        _fallbackLocalCancel(orderId, reason, 'system');
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Tự động quét và hủy các đơn hàng VietQR chưa thanh toán đã quá hạn (Auto-cancel timeout)
   /// - Hoàn lại tồn kho SKU và chuyển status sang Cancelled
   Future<void> checkAndCancelExpiredOrders() async {
-    final expiredOrders = _userOrders.where((o) => o.isPaymentExpired()).toList();
-    for (final order in expiredOrders) {
-      await cancelOrder(
-        order.orderId,
-        cancelReason: 'Đơn hàng tự động hủy do quá hạn thanh toán (${AppConstants.unpaidOrderTimeoutMinutes} phút)',
-        cancelledBy: 'system',
-      );
+    final Map<String, OrderModel> expiredMap = {};
+    for (final o in _userOrders) {
+      if (o.isPaymentExpired()) expiredMap[o.orderId] = o;
+    }
+    for (final o in _allOrders) {
+      if (o.isPaymentExpired()) expiredMap[o.orderId] = o;
+    }
+
+    for (final order in expiredMap.values) {
+      if (_processingVietQrIds.contains(order.orderId)) continue;
+      _processingVietQrIds.add(order.orderId);
+      try {
+        await cancelOrder(
+          order.orderId,
+          cancelReason:
+              'Đơn hàng tự động hủy do quá hạn thanh toán (${AppConstants.unpaidOrderTimeoutMinutes} phút)',
+          cancelledBy: 'system',
+        );
+      } finally {
+        _processingVietQrIds.remove(order.orderId);
+      }
+    }
+  }
+
+  /// Khởi chạy bộ giám sát ngầm cho các đơn VietQR đang chờ thanh toán:
+  /// - Tự động đối soát SePay ngầm ngay cả khi khách đã đóng Popup QR để ra danh sách đơn hàng.
+  /// - Tự động hủy đơn & hoàn kho ngay khi hết hạn thanh toán (2 phút) mà không cần bấm mở lại mã QR.
+  void _startVietQrLifecycleWatcher() {
+    if (_vietQrLifecycleTimer != null && _vietQrLifecycleTimer!.isActive) return;
+    try {
+      if (Platform.environment.containsKey('FLUTTER_TEST')) return;
+    } catch (_) {}
+
+    _vietQrLifecycleTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      _sweepAwaitingVietQrOrders();
+    });
+  }
+
+  Future<void> _sweepAwaitingVietQrOrders() async {
+    final Map<String, OrderModel> awaitingMap = {};
+    for (final o in _userOrders) {
+      if (o.isAwaitingPayment) awaitingMap[o.orderId] = o;
+    }
+    for (final o in _allOrders) {
+      if (o.isAwaitingPayment) awaitingMap[o.orderId] = o;
+    }
+
+    if (awaitingMap.isEmpty) return;
+
+    for (final order in awaitingMap.values) {
+      if (_processingVietQrIds.contains(order.orderId)) continue;
+      _processingVietQrIds.add(order.orderId);
+
+      try {
+        if (order.isPaymentExpired()) {
+          // Kiểm tra SePay lần cuối phòng trường hợp khách vừa chuyển khoản sát nút hết giờ
+          final lastCheck = await SepayService.checkOrderPaid(
+            orderId: order.orderId,
+            expectedAmount: order.totalPrice,
+          );
+          if (lastCheck.isSuccess) {
+            await confirmPaymentPaid(order.orderId);
+          } else {
+            await _cancelExpiredOrderSilently(order.orderId);
+          }
+        } else {
+          // Đơn còn trong hạn thanh toán -> tự động quét SePay ngầm
+          final checkResult = await SepayService.checkOrderPaid(
+            orderId: order.orderId,
+            expectedAmount: order.totalPrice,
+          );
+          if (checkResult.isSuccess) {
+            await confirmPaymentPaid(order.orderId);
+          }
+        }
+      } catch (_) {
+      } finally {
+        _processingVietQrIds.remove(order.orderId);
+      }
     }
   }
 
@@ -623,6 +731,7 @@ class OrderProvider extends ChangeNotifier {
   void dispose() {
     _userOrdersSub?.cancel();
     _allOrdersSub?.cancel();
+    _vietQrLifecycleTimer?.cancel();
     super.dispose();
   }
 }

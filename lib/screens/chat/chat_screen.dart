@@ -1,5 +1,5 @@
 import 'dart:math';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/utils/app_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
@@ -626,7 +626,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           msg.productImageUrl!.isNotEmpty)
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4),
-                          child: CachedNetworkImage(
+                          child: AppImage(
                             imageUrl: msg.productImageUrl!,
                             width: 38,
                             height: 38,

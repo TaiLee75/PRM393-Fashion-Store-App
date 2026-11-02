@@ -140,7 +140,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ Đã tải ảnh từ thiết bị và nén tối ưu!'),
+              content: Text('✅ Đã chọn hình ảnh từ thiết bị!'),
               backgroundColor: AppColors.success,
             ),
           );
@@ -316,7 +316,25 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     for (final s in _selectedSizes) {
       for (final c in _selectedColors) {
         final key = '${s}_$c';
-        variantStock.putIfAbsent(key, () => perSkuStock > 0 ? perSkuStock : 10);
+        variantStock.putIfAbsent(key, () => perSkuStock);
+      }
+    }
+
+    final List<String> activeSkuKeys = [
+      for (final s in _selectedSizes)
+        for (final c in _selectedColors) '${s}_$c',
+    ];
+    variantStock.removeWhere((k, _) => !activeSkuKeys.contains(k));
+    final int currentVariantSum =
+        variantStock.values.fold<int>(0, (sum, v) => sum + v);
+    if (!isEditMode || currentVariantSum != cleanStock) {
+      variantStock.clear();
+      if (activeSkuKeys.isNotEmpty) {
+        final int baseStock = cleanStock ~/ activeSkuKeys.length;
+        final int remainder = cleanStock % activeSkuKeys.length;
+        for (int i = 0; i < activeSkuKeys.length; i++) {
+          variantStock[activeSkuKeys[i]] = baseStock + (i < remainder ? 1 : 0);
+        }
       }
     }
 
@@ -583,7 +601,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                   TextFormField(
                     controller: _imageUrlController,
                     decoration: InputDecoration(
-                      labelText: 'Đường dẫn ảnh chính (URL hoặc Base64) *',
+                      labelText: 'Hình ảnh chính (URL hoặc tải từ máy) *',
                       hintText: 'https://... hoặc chọn ảnh từ máy',
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.image_outlined),
@@ -634,7 +652,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                               child: TextFormField(
                                 controller: _additionalImageControllers[idx],
                                 decoration: InputDecoration(
-                                  labelText: 'Ảnh phụ ${idx + 1} (URL / Base64)',
+                                  labelText: 'Hình ảnh phụ ${idx + 1}',
                                   hintText: 'https://... hoặc chọn từ máy',
                                   border: const OutlineInputBorder(),
                                   prefixIcon: const Icon(Icons.add_photo_alternate_outlined),

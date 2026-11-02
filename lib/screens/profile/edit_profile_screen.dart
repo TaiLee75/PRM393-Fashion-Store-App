@@ -155,7 +155,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ Đã tải ảnh từ thiết bị và nén dung lượng tối ưu!'),
+              content: Text('✅ Đã cập nhật ảnh đại diện mới!'),
               backgroundColor: AppColors.success,
             ),
           );
@@ -444,7 +444,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 TextFormField(
                   controller: _avatarUrlController,
                   decoration: InputDecoration(
-                    labelText: 'Đường dẫn ảnh đại diện tùy chỉnh (URL hoặc Base64)',
+                    labelText: 'Đường dẫn ảnh đại diện (URL)',
                     hintText: 'https://images.unsplash.com/...',
                     border: const OutlineInputBorder(),
                     prefixIcon: const Icon(Icons.link),

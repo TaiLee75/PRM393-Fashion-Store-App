@@ -737,7 +737,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Chế độ Demo: Bạn đang đặt hàng với tư cách Quản trị viên (Admin) để kiểm thử luồng mua hàng.',
+                        'Bạn đang đặt hàng bằng tài khoản Quản trị viên.',
                         style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                       ),
                     ),

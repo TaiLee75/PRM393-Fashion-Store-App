@@ -11,13 +11,11 @@ import '../../../models/order_model.dart';
 import '../../../providers/order_provider.dart';
 import '../../../services/sepay_service.dart';
 
-/// Hộp thoại thanh toán qua Cổng VietQR Napas247 động & Động cơ Đối soát 3 Tầng:
+/// Hộp thoại thanh toán qua Cổng VietQR Napas247 động & Động cơ Đối soát Tự động SePay:
 /// - Khóa Bẫy 8: Tiêu đề động theo isFromCheckout
 /// - Tự động đối soát thời gian thực qua Cổng SePay Open Banking (MBBank)
-/// - Nút "Tôi đã chuyển khoản": Kiểm tra tức thì biến động số dư SePay -> Paid ngay
-/// - Hỗ trợ nhập mã giao dịch thủ công dự phòng nếu ngân hàng nghẽn mạng
+/// - Tự động hủy đơn & hoàn kho khi quá hạn thanh toán (kể cả khi mở lại mã QR của đơn đã hết hạn)
 /// - Live Stream Auto-Dismiss: Tự động phát hiện khi đơn đổi sang 'Paid' để đóng dialog
-/// - Sandbox Demo Mode: Nút mô phỏng Webhook ngân hàng thành công sau 2s phục vụ chấm điểm đồ án
 class VietQrPaymentDialog extends StatefulWidget {
   final String orderId;
   final num totalPrice;
@@ -50,6 +48,7 @@ class _VietQrPaymentDialogState extends State<VietQrPaymentDialog> {
   Duration _remainingTime = const Duration(minutes: AppConstants.unpaidOrderTimeoutMinutes);
   bool _isPaidSuccess = false;
   bool _isCancelled = false;
+  bool _hasTriggeredBackendCancel = false;
   DateTime? _orderCreatedAt;
 
   @override
@@ -61,6 +60,12 @@ class _VietQrPaymentDialogState extends State<VietQrPaymentDialog> {
       if (DateTime.now().isAfter(expiry)) {
         _isCancelled = true;
         _remainingTime = Duration.zero;
+        // Đảm bảo nếu đơn hàng trên hệ thống chưa chuyển sang Cancelled thì gọi hủy ngay
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_isPaidSuccess) {
+            _ensureExpiredOrderCancelledInBackend();
+          }
+        });
       }
     }
     _initLiveStreamListener();
@@ -73,11 +78,17 @@ class _VietQrPaymentDialogState extends State<VietQrPaymentDialog> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.orderId != widget.orderId || oldWidget.createdAt != widget.createdAt) {
       _orderCreatedAt = widget.createdAt;
+      _hasTriggeredBackendCancel = false;
       if (widget.createdAt != null) {
         final expiry = widget.createdAt!.add(const Duration(minutes: AppConstants.unpaidOrderTimeoutMinutes));
         if (DateTime.now().isAfter(expiry)) {
           _isCancelled = true;
           _remainingTime = Duration.zero;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_isPaidSuccess) {
+              _ensureExpiredOrderCancelledInBackend();
+            }
+          });
         } else {
           _isCancelled = false;
         }
@@ -106,7 +117,7 @@ class _VietQrPaymentDialogState extends State<VietQrPaymentDialog> {
 
     if (diff.isNegative || diff == Duration.zero) {
       _countdownTimer?.cancel();
-      if (mounted && !_isPaidSuccess && !_isCancelled) {
+      if (mounted && !_isPaidSuccess) {
         _handleOrderTimeoutExpired();
       }
     } else {
@@ -116,19 +127,34 @@ class _VietQrPaymentDialogState extends State<VietQrPaymentDialog> {
     }
   }
 
-  Future<void> _handleOrderTimeoutExpired() async {
-    setState(() {
-      _isCancelled = true;
-      _remainingTime = Duration.zero;
-    });
+  Future<void> _ensureExpiredOrderCancelledInBackend() async {
+    if (_hasTriggeredBackendCancel) return;
+    _hasTriggeredBackendCancel = true;
 
-    try {
-      await context.read<OrderProvider>().cancelOrder(
-        widget.orderId,
-        cancelReason: 'Đơn hàng tự động hủy do quá hạn thanh toán (${AppConstants.unpaidOrderTimeoutMinutes} phút)',
-        cancelledBy: 'system',
-      );
-    } catch (_) {}
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _isPaidSuccess) return;
+      try {
+        final orderProvider = context.read<OrderProvider>();
+        final existing = orderProvider.findById(widget.orderId);
+        if (existing != null && existing.isCancelled) return;
+
+        await orderProvider.cancelOrder(
+          widget.orderId,
+          cancelReason: 'Đơn hàng tự động hủy do quá hạn thanh toán (${AppConstants.unpaidOrderTimeoutMinutes} phút)',
+          cancelledBy: 'system',
+        );
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _handleOrderTimeoutExpired() async {
+    if (!_isCancelled) {
+      setState(() {
+        _isCancelled = true;
+        _remainingTime = Duration.zero;
+      });
+    }
+    await _ensureExpiredOrderCancelledInBackend();
   }
 
   void _startSepayAutoPolling() {
@@ -173,12 +199,21 @@ class _VietQrPaymentDialogState extends State<VietQrPaymentDialog> {
         if (!mounted || order == null) return;
         _orderCreatedAt = order.createdAt;
 
-        if ((order.isCancelled || order.isPaymentExpired()) && !_isCancelled) {
+        if (order.isCancelled) {
           _countdownTimer?.cancel();
-          setState(() {
-            _isCancelled = true;
-            _remainingTime = Duration.zero;
-          });
+          _hasTriggeredBackendCancel = true;
+          if (!_isCancelled) {
+            setState(() {
+              _isCancelled = true;
+              _remainingTime = Duration.zero;
+            });
+          }
+          return;
+        }
+
+        if (order.isPaymentExpired() && !order.isCancelled) {
+          _countdownTimer?.cancel();
+          _handleOrderTimeoutExpired();
           return;
         }
 
@@ -635,4 +670,3 @@ class _VietQrPaymentDialogState extends State<VietQrPaymentDialog> {
     return '$m:$s';
   }
 }
-
